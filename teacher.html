@@ -165,7 +165,7 @@
       const cancelBtn = allowCancel ? `<button class="btn btn-sm btn-danger me-2" onclick="cancelBooking('${doc.id}')">إلغاء</button>` : "";
 
       const whatsappMsg = encodeURIComponent(`مرحباً، أريد حجز موعد بتاريخ ${data.date} بساعة ${data.time}`);
-      const whatsappBtn = `<a target="_blank" href="https://wa.me/9647855002173?text=${whatsappMsg}" class="btn btn-sm btn-outline-success">📩 واتساب</a>`;
+      const whatsappBtn = `<a href="https://wa.me/9647855002173?text=${whatsappMsg}" target="_blank" class="btn btn-sm btn-outline-success">📩 أرسل للواتساب</a>`;
 
       list.innerHTML += `
         <div class="border p-3 rounded mb-3 bg-white">
