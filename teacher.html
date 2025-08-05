@@ -68,15 +68,137 @@
 
 <!-- Firebase Config -->
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
-    authDomain: "scudual.firebaseapp.com",
-    projectId: "scudual"
-  };
+  let currentUser = null;
 
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
+  // ✅ تحقق من تسجيل الدخول
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+      window.location.href = "index.html";
+    } else {
+      currentUser = user;
+      loadBookings();
+    }
+  });
+
+  // ✅ السماح بالحجز ليوم غد فقط
+  const bookingDateInput = document.getElementById("bookingDate");
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  bookingDateInput.valueAsDate = tomorrow;
+  bookingDateInput.min = tomorrow.toISOString().split("T")[0];
+  bookingDateInput.max = bookingDateInput.min;
+
+  // ✅ إرسال الحجز إلى فايربيس
+  document.getElementById("bookingForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const date = bookingDateInput.value;
+    const time = document.getElementById("bookingTime").value;
+    const studio = document.getElementById("bookingStudio").value;
+
+    // تحقق من التكرار
+    const existing = await db.collection("bookings")
+      .where("date", "==", date)
+      .where("time", "==", time)
+      .where("studio", "==", studio)
+      .get();
+
+    if (!existing.empty) {
+      alert("⚠️ يوجد حجز بالفعل في هذا الوقت في هذا الاستوديو.");
+      return;
+    }
+
+    await db.collection("bookings").add({
+      userId: currentUser.uid,
+      date,
+      time,
+      studio,
+      status: "pending",
+      createdAt: new Date()
+    });
+
+    alert("✅ تم إرسال طلب الحجز!");
+    loadBookings();
+  });
+
+  // ✅ عرض الحجوزات الخاصة بالمستخدم
+  async function loadBookings() {
+    const list = document.getElementById("bookingsList");
+    list.innerHTML = "";
+    const now = new Date();
+
+    const snapshot = await db.collection("bookings")
+      .where("userId", "==", currentUser.uid)
+      .orderBy("date")
+      .get();
+
+    if (snapshot.empty) {
+      list.innerHTML = "<p class='text-muted'>لا توجد حجوزات حالياً.</p>";
+      return;
+    }
+
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const bookingDateTime = new Date(`${data.date}T${convertTo24H(data.time)}`);
+      const diffHours = (bookingDateTime - now) / (1000 * 60 * 60);
+
+      let statusBadge = "";
+      if (data.status === "approved") {
+        if (diffHours > 5) {
+          statusBadge = `<span class="badge bg-success badge-status">نشط</span>`;
+        } else if (diffHours <= 5 && diffHours > 0) {
+          statusBadge = `<span class="badge bg-warning text-dark badge-status">لاتنسى موعدك اليوم</span>`;
+        } else {
+          statusBadge = `<span class="badge bg-danger badge-status">انتهى الموعد</span>`;
+        }
+      } else {
+        statusBadge = `<span class="badge bg-secondary badge-status">قيد الانتظار</span>`;
+      }
+
+      const allowCancel = diffHours >= 12;
+      const cancelBtn = allowCancel ? `<button class="btn btn-sm btn-danger me-2" onclick="cancelBooking('${doc.id}')">إلغاء</button>` : "";
+
+      const whatsappMsg = encodeURIComponent(
+        `مرحباً، أنا أستاذ وأرغب بحجز موعد بتاريخ ${data.date} بساعة ${data.time}`
+      );
+      const whatsappBtn = `<a target="_blank" href="https://wa.me/9647855002173?text=${whatsappMsg}" class="btn btn-sm btn-outline-success">📩 واتساب</a>`;
+
+      list.innerHTML += `
+        <div class="border p-3 rounded mb-3 bg-white">
+          <div class="d-flex justify-content-between">
+            <div>
+              <strong>📅 ${data.date}</strong> - 🕓 ${data.time} - 🎬 ${data.studio}<br/>
+              ${statusBadge}
+            </div>
+            <div>
+              ${cancelBtn}
+              ${whatsappBtn}
+            </div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  // ✅ إلغاء الحجز
+  async function cancelBooking(id) {
+    if (confirm("هل أنت متأكد من إلغاء هذا الحجز؟")) {
+      await db.collection("bookings").doc(id).delete();
+      loadBookings();
+    }
+  }
+
+  // ✅ تحويل الوقت من 12 إلى 24
+  function convertTo24H(timeStr) {
+    const [time, modifier] = timeStr.split(" ");
+    let [hours, minutes] = time.split(":");
+    if (modifier === "مساءً" && hours !== "12") {
+      hours = parseInt(hours) + 12;
+    }
+    if (modifier === "صباحًا" && hours === "12") {
+      hours = "00";
+    }
+    return `${hours}:${minutes}`;
+  }
 </script>
 
 <!-- المنطق سيتم استكماله بعد قليل -->
