@@ -1,246 +1,143 @@
+<!-- صفحة الأستاذ - كاملة -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>لوحة الإدارة - Scudual</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>صفحة الأستاذ</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
+      authDomain: "scudual.firebaseapp.com",
+      projectId: "scudual",
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+  </script>
 </head>
 <body class="bg-light">
-<div class="container my-4">
-  <h3 class="text-center mb-4">لوحة التحكم - المدير</h3>
+<div class="container py-4">
+  <h3 id="greeting" class="mb-4 fw-bold">مرحباً أستاذ 👋</h3>
 
-  <!-- ✅ الطلبات الجديدة -->
-  <div class="card mb-4">
-    <div class="card-header bg-warning">📥 طلبات الحجز الجديدة</div>
-    <div class="card-body" id="pendingBookings">
-      <p class="text-muted">جارٍ التحميل...</p>
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body text-center">
+          <h5 class="card-title">🟢 حجز موعد</h5>
+          <p class="card-text">اضغط هنا لحجز موعد تصوير جديد.</p>
+          <button class="btn btn-success" onclick="showBookingForm()">احجز الآن</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body text-center">
+          <h5 class="card-title">📋 حجوزاتي</h5>
+          <p class="card-text">عرض جميع الحجوزات الحالية والماضية.</p>
+          <button class="btn btn-primary" onclick="showMyBookings()">عرض الحجوزات</button>
+        </div>
+      </div>
     </div>
   </div>
 
-  <!-- ✅ من سيصور اليوم -->
-  <div class="card mb-4">
-    <div class="card-header bg-success text-white">🎥 من سيصور اليوم</div>
-    <div class="card-body" id="todayBookings">
-      <p class="text-muted">جارٍ التحميل...</p>
-    </div>
-  </div>
+  <div id="dynamicContent" class="mt-5"></div>
+</div>
 
-  <!-- ✅ من سيصور غدًا -->
-  <div class="card mb-4">
-    <div class="card-header bg-info text-white">📅 من سيصور غدًا</div>
-    <div class="card-body" id="tomorrowBookings">
-      <p class="text-muted">جارٍ التحميل...</p>
-    </div>
-  </div>
+<script>
+  let currentUser = null;
+  let currentUserName = "أستاذ";
 
-  <!-- ✅ إضافة أستاذ -->
-  <div class="card mb-5">
-    <div class="card-header bg-primary text-white">➕ إضافة أستاذ جديد</div>
-    <div class="card-body">
-      <form id="addTeacherForm">
+  auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+      location.href = "index.html";
+      return;
+    }
+    currentUser = user;
+    const doc = await db.collection("users").doc(user.uid).get();
+    currentUserName = doc.data()?.name || "أستاذ";
+    document.getElementById("greeting").innerText = `مرحباً أستاذ ${currentUserName} 👋`;
+  });
+
+  function showBookingForm() {
+    const html = `
+      <div class="card p-4 shadow">
+        <h5 class="mb-3">🟢 نموذج الحجز</h5>
         <div class="row g-3">
           <div class="col-md-4">
-            <input type="text" id="name" class="form-control" placeholder="الاسم الكامل" required />
+            <label class="form-label">📅 تاريخ الموعد</label>
+            <input type="date" id="bookingDate" class="form-control" min="${getTomorrowDate()}">
           </div>
           <div class="col-md-4">
-            <input type="email" id="email" class="form-control" placeholder="البريد الإلكتروني" required />
-          </div>
-          <div class="col-md-4">
-            <input type="password" id="password" class="form-control" placeholder="كلمة المرور" required />
-          </div>
-          <div class="col-md-4">
-            <select id="role" class="form-select" required>
-              <option value="teacher">أستاذ</option>
-              <option value="admin">مدير</option>
+            <label class="form-label">⏰ وقت التصوير</label>
+            <select id="bookingTime" class="form-select">
+              <option value="">اختر الوقت</option>
+              <option value="08:00">08:00</option>
+              <option value="10:00">10:00</option>
+              <option value="12:00">12:00</option>
+              <option value="14:00">14:00</option>
+              <option value="16:00">16:00</option>
+              <option value="18:00">18:00</option>
+              <option value="20:00">20:00</option>
+              <option value="22:00">22:00</option>
             </select>
           </div>
           <div class="col-md-4">
-            <button type="submit" class="btn btn-success w-100">إضافة</button>
+            <label class="form-label">🎥 الاستوديو</label>
+            <select id="bookingStudio" class="form-select">
+              <option value="">اختر الاستوديو</option>
+              <option value="الرئيسي">📷 الرئيسي</option>
+              <option value="الثانوي">🎥 الثانوي</option>
+            </select>
           </div>
         </div>
-      </form>
-      <div id="addTeacherMsg" class="mt-3 text-success text-center"></div>
-    </div>
-  </div>
-</div>
-<script>
-  // إعداد فايربيس
-  const firebaseConfig = {
-    apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
-    authDomain: "scudual.firebaseapp.com",
-    projectId: "scudual"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-
-  // التحقق من الدخول وصلاحية المدير
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) {
-      window.location.href = "index.html";
-    } else {
-      const userDoc = await db.collection("users").doc(user.uid).get();
-      if (!userDoc.exists || userDoc.data().role !== "admin") {
-        alert("❌ لا تملك صلاحيات الدخول هنا.");
-        window.location.href = "index.html";
-      } else {
-        loadPendingBookings();
-        loadTodayBookings();
-        loadTomorrowBookings();
-      }
-    }
-  });
-
-  // عرض الطلبات الجديدة
- async function loadPendingBookings() {
-  const container = document.getElementById("pendingBookings");
-  container.innerHTML = "";
-  const snapshot = await db.collection("bookings").where("status", "==", "pending").get();
-
-  if (snapshot.empty) {
-    container.innerHTML = "<p class='text-muted'>لا توجد طلبات حالياً.</p>";
-    return;
-  }
-
-  for (const doc of snapshot.docs) {
-    const data = doc.data();
-    const userSnap = await db.collection("users").doc(data.userId).get();
-    const userName = userSnap.exists ? userSnap.data().name : "أستاذ مجهول";
-
-    const card = document.createElement("div");
-    card.className = "border p-3 rounded mb-3 bg-white d-flex justify-content-between align-items-center";
-
-    card.innerHTML = `
-      <div>
-        <strong>${userName}</strong><br/>
-        التاريخ: ${data.date} - الساعة: ${data.time} - الاستوديو: ${data.studio}
-      </div>
-      <div>
-        <button class="btn btn-sm btn-success me-2" onclick="approveBooking('${doc.id}')">✔ موافقة</button>
-        <button class="btn btn-sm btn-outline-danger" onclick="rejectBooking('${doc.id}')">✖ عدم الموافقة</button>
+        <div class="text-end mt-3">
+          <button class="btn btn-success" onclick="submitBooking()">تثبيت الحجز</button>
+        </div>
       </div>
     `;
-
-    container.appendChild(card);
-  }
-}
-
-
-    snapshot.forEach(async (doc) => {
-      const data = doc.data();
-      const userSnap = await db.collection("users").doc(data.userId).get();
-      const userName = userSnap.exists ? userSnap.data().name : "أستاذ مجهول";
-
-      const card = document.createElement("div");
-      card.className = "border p-3 rounded mb-3 bg-white d-flex justify-content-between align-items-center";
-      card.innerHTML = `
-        <div>
-          <strong>${userName}</strong><br/>
-          التاريخ: ${data.date} - الساعة: ${data.time} - الاستوديو: ${data.studio}
-        </div>
-        <button class="btn btn-sm btn-success" onclick="approveBooking('${doc.id}')">✔ موافقة</button>
-      `;
-      container.appendChild(card);
-    });
+    document.getElementById("dynamicContent").innerHTML = html;
   }
 
-  // الموافقة على الحجز
-  async function approveBooking(id) {
-    await db.collection("bookings").doc(id).update({
-      status: "approved"
-    });
-    loadPendingBookings();
-    loadTodayBookings();
-    loadTomorrowBookings();
-  }
-
-  // عرض من سيصور اليوم
-  async function loadTodayBookings() {
-    const container = document.getElementById("todayBookings");
-    container.innerHTML = "";
-    const today = new Date().toISOString().split("T")[0];
-
-    const snapshot = await db.collection("bookings")
-      .where("date", "==", today)
-      .where("status", "==", "approved")
-      .get();
-
-    if (snapshot.empty) {
-      container.innerHTML = "<p class='text-muted'>لا يوجد تصوير اليوم.</p>";
-      return;
-    }
-
-    snapshot.forEach(async (doc) => {
-      const data = doc.data();
-      const userSnap = await db.collection("users").doc(data.userId).get();
-      const userName = userSnap.exists ? userSnap.data().name : "أستاذ مجهول";
-
-      container.innerHTML += `
-        <div class="border p-2 rounded mb-2 bg-white">
-          <strong>${userName}</strong> - ${data.time} - الاستوديو: ${data.studio}
-        </div>
-      `;
-    });
-  }
-
-  // عرض من سيصور غداً
-  async function loadTomorrowBookings() {
-    const container = document.getElementById("tomorrowBookings");
-    container.innerHTML = "";
+  function getTomorrowDate() {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toISOString().split("T")[0];
-
-    const snapshot = await db.collection("bookings")
-      .where("date", "==", dateStr)
-      .where("status", "==", "approved")
-      .get();
-
-    if (snapshot.empty) {
-      container.innerHTML = "<p class='text-muted'>لا يوجد تصوير غدًا.</p>";
-      return;
-    }
-
-    snapshot.forEach(async (doc) => {
-      const data = doc.data();
-      const userSnap = await db.collection("users").doc(data.userId).get();
-      const userName = userSnap.exists ? userSnap.data().name : "أستاذ مجهول";
-
-      container.innerHTML += `
-        <div class="border p-2 rounded mb-2 bg-white">
-          <strong>${userName}</strong> - ${data.time} - الاستوديو: ${data.studio}
-        </div>
-      `;
-    });
+    return tomorrow.toISOString().split("T")[0];
   }
 
-  // إضافة أستاذ جديد
-  document.getElementById("addTeacherForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const name = document.getElementById("name").value;
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
-    const role = document.getElementById("role").value;
-    const msg = document.getElementById("addTeacherMsg");
+  async function submitBooking() {
+    const date = document.getElementById("bookingDate").value;
+    const time = document.getElementById("bookingTime").value;
+    const studio = document.getElementById("bookingStudio").value;
 
-    try {
-      const newUser = await auth.createUserWithEmailAndPassword(email, password);
-      const uid = newUser.user.uid;
+    if (!date || !time || !studio) return alert("يرجى تعبئة جميع الحقول");
 
-      await db.collection("users").doc(uid).set({
-        name,
-        role
-      });
+    const snap = await db.collection("bookings")
+      .where("date", "==", date)
+      .where("time", "==", time)
+      .where("studio", "==", studio)
+      .get();
 
-      msg.textContent = "✅ تم إضافة الأستاذ بنجاح.";
-      e.target.reset();
-    } catch (error) {
-      msg.textContent = "❌ خطأ: " + error.message;
-    }
-  });
+    if (!snap.empty) return alert("هذا الموعد محجوز بالفعل، اختر موعداً آخر");
+
+    await db.collection("bookings").add({
+      userId: currentUser.uid,
+      userName: currentUserName,
+      date,
+      time,
+      studio,
+      status: "pending",
+      createdAt: firebase.firestore.Timestamp.now()
+    });
+
+    alert("تم إرسال طلب الحجز، بانتظار الموافقة ✅");
+    document.getElementById("dynamicContent").innerHTML = "";
+  }
 </script>
 </body>
 </html>
