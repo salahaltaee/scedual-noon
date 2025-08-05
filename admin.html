@@ -95,15 +95,39 @@
   });
 
   // عرض الطلبات الجديدة
-  async function loadPendingBookings() {
-    const container = document.getElementById("pendingBookings");
-    container.innerHTML = "";
-    const snapshot = await db.collection("bookings").where("status", "==", "pending").get();
+ async function loadPendingBookings() {
+  const container = document.getElementById("pendingBookings");
+  container.innerHTML = "";
+  const snapshot = await db.collection("bookings").where("status", "==", "pending").get();
 
-    if (snapshot.empty) {
-      container.innerHTML = "<p class='text-muted'>لا توجد طلبات حالياً.</p>";
-      return;
-    }
+  if (snapshot.empty) {
+    container.innerHTML = "<p class='text-muted'>لا توجد طلبات حالياً.</p>";
+    return;
+  }
+
+  for (const doc of snapshot.docs) {
+    const data = doc.data();
+    const userSnap = await db.collection("users").doc(data.userId).get();
+    const userName = userSnap.exists ? userSnap.data().name : "أستاذ مجهول";
+
+    const card = document.createElement("div");
+    card.className = "border p-3 rounded mb-3 bg-white d-flex justify-content-between align-items-center";
+
+    card.innerHTML = `
+      <div>
+        <strong>${userName}</strong><br/>
+        التاريخ: ${data.date} - الساعة: ${data.time} - الاستوديو: ${data.studio}
+      </div>
+      <div>
+        <button class="btn btn-sm btn-success me-2" onclick="approveBooking('${doc.id}')">✔ موافقة</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="rejectBooking('${doc.id}')">✖ عدم الموافقة</button>
+      </div>
+    `;
+
+    container.appendChild(card);
+  }
+}
+
 
     snapshot.forEach(async (doc) => {
       const data = doc.data();
