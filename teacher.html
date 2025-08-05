@@ -1,4 +1,3 @@
-<!-- صفحة الأستاذ - كاملة -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -13,7 +12,7 @@
     const firebaseConfig = {
       apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
       authDomain: "scudual.firebaseapp.com",
-      projectId: "scudual",
+      projectId: "scudual"
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
@@ -21,123 +20,148 @@
   </script>
 </head>
 <body class="bg-light">
-<div class="container py-4">
-  <h3 id="greeting" class="mb-4 fw-bold">مرحباً أستاذ 👋</h3>
+  <div class="container py-4">
+    <div id="greeting" class="mb-4 h4 fw-bold"></div>
 
-  <div class="row g-4">
-    <div class="col-md-6">
-      <div class="card shadow-sm h-100">
-        <div class="card-body text-center">
-          <h5 class="card-title">🟢 حجز موعد</h5>
-          <p class="card-text">اضغط هنا لحجز موعد تصوير جديد.</p>
-          <button class="btn btn-success" onclick="showBookingForm()">احجز الآن</button>
-        </div>
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <button class="btn btn-primary w-100" onclick="showBookingForm()">📅 حجز موعد</button>
+      </div>
+      <div class="col-md-6">
+        <button class="btn btn-secondary w-100" onclick="showMyBookings()">📋 حجوزاتي</button>
       </div>
     </div>
 
-    <div class="col-md-6">
-      <div class="card shadow-sm h-100">
-        <div class="card-body text-center">
-          <h5 class="card-title">📋 حجوزاتي</h5>
-          <p class="card-text">عرض جميع الحجوزات الحالية والماضية.</p>
-          <button class="btn btn-primary" onclick="showMyBookings()">عرض الحجوزات</button>
-        </div>
-      </div>
-    </div>
+    <div id="dynamicContent"></div>
   </div>
 
-  <div id="dynamicContent" class="mt-5"></div>
-</div>
+  <script>
+    let currentUser;
 
-<script>
-  let currentUser = null;
-  let currentUserName = "أستاذ";
-
-  auth.onAuthStateChanged(async (user) => {
-    if (!user) {
-      location.href = "index.html";
-      return;
-    }
-    currentUser = user;
-    const doc = await db.collection("users").doc(user.uid).get();
-    currentUserName = doc.data()?.name || "أستاذ";
-    document.getElementById("greeting").innerText = `مرحباً أستاذ ${currentUserName} 👋`;
-  });
-
-  function showBookingForm() {
-    const html = `
-      <div class="card p-4 shadow">
-        <h5 class="mb-3">🟢 نموذج الحجز</h5>
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label">📅 تاريخ الموعد</label>
-            <input type="date" id="bookingDate" class="form-control" min="${getTomorrowDate()}">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">⏰ وقت التصوير</label>
-            <select id="bookingTime" class="form-select">
-              <option value="">اختر الوقت</option>
-              <option value="08:00">08:00</option>
-              <option value="10:00">10:00</option>
-              <option value="12:00">12:00</option>
-              <option value="14:00">14:00</option>
-              <option value="16:00">16:00</option>
-              <option value="18:00">18:00</option>
-              <option value="20:00">20:00</option>
-              <option value="22:00">22:00</option>
-            </select>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">🎥 الاستوديو</label>
-            <select id="bookingStudio" class="form-select">
-              <option value="">اختر الاستوديو</option>
-              <option value="الرئيسي">📷 الرئيسي</option>
-              <option value="الثانوي">🎥 الثانوي</option>
-            </select>
-          </div>
-        </div>
-        <div class="text-end mt-3">
-          <button class="btn btn-success" onclick="submitBooking()">تثبيت الحجز</button>
-        </div>
-      </div>
-    `;
-    document.getElementById("dynamicContent").innerHTML = html;
-  }
-
-  function getTomorrowDate() {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toISOString().split("T")[0];
-  }
-
-  async function submitBooking() {
-    const date = document.getElementById("bookingDate").value;
-    const time = document.getElementById("bookingTime").value;
-    const studio = document.getElementById("bookingStudio").value;
-
-    if (!date || !time || !studio) return alert("يرجى تعبئة جميع الحقول");
-
-    const snap = await db.collection("bookings")
-      .where("date", "==", date)
-      .where("time", "==", time)
-      .where("studio", "==", studio)
-      .get();
-
-    if (!snap.empty) return alert("هذا الموعد محجوز بالفعل، اختر موعداً آخر");
-
-    await db.collection("bookings").add({
-      userId: currentUser.uid,
-      userName: currentUserName,
-      date,
-      time,
-      studio,
-      status: "pending",
-      createdAt: firebase.firestore.Timestamp.now()
+    auth.onAuthStateChanged(user => {
+      if (!user) location.href = 'index.html';
+      currentUser = user;
+      document.getElementById("greeting").innerText = `مرحبا أستاذ ${user.displayName || ""}`;
     });
 
-    alert("تم إرسال طلب الحجز، بانتظار الموافقة ✅");
-    document.getElementById("dynamicContent").innerHTML = "";
-  }
-</script>
+    function getTomorrowDate() {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow.toISOString().split("T")[0];
+    }
+
+    function showBookingForm() {
+      const html = `
+        <div class="card p-4 shadow">
+          <h5 class="mb-3">🟢 نموذج الحجز</h5>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">📅 تاريخ الموعد</label>
+              <input type="date" id="bookingDate" class="form-control" min="${getTomorrowDate()}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">⏰ وقت التصوير</label>
+              <select id="bookingTime" class="form-select">
+                <option value="">اختر الوقت</option>
+                <option value="08:00">08:00</option>
+                <option value="10:00">10:00</option>
+                <option value="12:00">12:00</option>
+                <option value="14:00">14:00</option>
+                <option value="16:00">16:00</option>
+                <option value="18:00">18:00</option>
+                <option value="20:00">20:00</option>
+                <option value="22:00">22:00</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">🎥 الاستوديو</label>
+              <select id="bookingStudio" class="form-select">
+                <option value="">اختر الاستوديو</option>
+                <option value="الرئيسي">📷 الرئيسي</option>
+                <option value="الثانوي">🎥 الثانوي</option>
+              </select>
+            </div>
+          </div>
+          <div class="text-end mt-3">
+            <button class="btn btn-success" onclick="submitBooking()">تثبيت الحجز</button>
+          </div>
+        </div>
+      `;
+      document.getElementById("dynamicContent").innerHTML = html;
+    }
+
+    async function submitBooking() {
+      const date = document.getElementById("bookingDate").value;
+      const time = document.getElementById("bookingTime").value;
+      const studio = document.getElementById("bookingStudio").value;
+
+      if (!date || !time || !studio) return alert("يرجى ملء كل الحقول");
+
+      const existing = await db.collection("bookings")
+        .where("date", "==", date)
+        .where("time", "==", time)
+        .where("studio", "==", studio)
+        .get();
+
+      if (!existing.empty) return alert("⚠️ هذا الموعد محجوز مسبقًا");
+
+      await db.collection("bookings").add({
+        userId: currentUser.uid,
+        userName: currentUser.displayName || "أستاذ",
+        date,
+        time,
+        studio,
+        status: "pending",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      alert("✅ تم إرسال الطلب بانتظار موافقة الإدارة");
+      showMyBookings();
+    }
+
+    function showMyBookings() {
+      const uid = currentUser?.uid;
+      if (!uid) return;
+
+      db.collection("bookings")
+        .where("userId", "==", uid)
+        .orderBy("date")
+        .get()
+        .then((snap) => {
+          let html = "<h5 class='mb-3'>📋 قائمة الحجوزات</h5>";
+          if (snap.empty) {
+            html += "<div class='alert alert-warning'>لا توجد حجوزات بعد</div>";
+          } else {
+            snap.forEach((doc) => {
+              const data = doc.data();
+              html += `
+                <div class="card mb-3 shadow-sm">
+                  <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                      <h6 class="fw-bold">${data.date} - ${data.time}</h6>
+                      <p class="mb-0">📍 ${data.studio} | الحالة: ${statusText(data.status)}</p>
+                    </div>
+                    <a class="btn btn-outline-success" href="https://wa.me/9647855002173?text=أريد%20حجز%20موعد%20بتاريخ%20${data.date}%20بساعة%20${data.time}" target="_blank">
+                      ارسال واتساب
+                    </a>
+                  </div>
+                </div>
+              `;
+            });
+          }
+          document.getElementById("dynamicContent").innerHTML = html;
+        });
+    }
+
+    function statusText(status) {
+      switch (status) {
+        case "pending": return "🟡 قيد الانتظار";
+        case "active": return "🟢 مؤكد";
+        case "done": return "🔴 منتهي";
+        case "rejected": return "❌ مرفوض";
+        default: return "❓ غير معروف";
+      }
+    }
+  </script>
 </body>
 </html>
