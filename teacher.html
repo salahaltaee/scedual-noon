@@ -22,17 +22,17 @@
 <div class="container section">
   <h3 class="text-center mb-4">مرحبًا أستاذ</h3>
 
-  <!-- بطاقة الحجز -->
+  <!-- ✅ نموذج الحجز -->
   <div class="card mb-4">
-    <div class="card-header bg-primary text-white">حجز موعد</div>
+    <div class="card-header bg-primary text-white">📅 حجز موعد</div>
     <div class="card-body">
       <form id="bookingForm">
         <div class="mb-3">
-          <label class="form-label">تاريخ الحجز</label>
+          <label class="form-label">📆 تاريخ الحجز</label>
           <input type="date" id="bookingDate" class="form-control" required />
         </div>
         <div class="mb-3">
-          <label class="form-label">الساعة</label>
+          <label class="form-label">🕓 الوقت</label>
           <select id="bookingTime" class="form-select" required>
             <option value="">اختر الوقت</option>
             <option>10:00 صباحًا</option>
@@ -45,7 +45,7 @@
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label">الاستوديو</label>
+          <label class="form-label">🎬 الاستوديو</label>
           <select id="bookingStudio" class="form-select" required>
             <option value="">اختر الاستوديو</option>
             <option value="الرئيسي">📷 الرئيسي</option>
@@ -57,41 +57,53 @@
     </div>
   </div>
 
-  <!-- قسم الحجوزات -->
+  <!-- ✅ قائمة الحجوزات -->
   <div class="card">
-    <div class="card-header bg-secondary text-white">الحجوزات الخاصة بك</div>
+    <div class="card-header bg-secondary text-white">📋 حجوزاتي</div>
     <div class="card-body" id="bookingsList">
       <p class="text-muted">لا توجد حجوزات حالياً.</p>
     </div>
   </div>
 </div>
-
-<!-- Firebase Config -->
+<!-- Firebase إعداد -->
 <script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
+    authDomain: "scudual.firebaseapp.com",
+    projectId: "scudual"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
   let currentUser = null;
 
-  // ✅ تحقق من تسجيل الدخول
+  // التحقق من تسجيل الدخول
   auth.onAuthStateChanged(async (user) => {
     if (!user) {
       window.location.href = "index.html";
     } else {
       currentUser = user;
+      setupTomorrowDateOnly();
       loadBookings();
     }
   });
 
-  // ✅ السماح بالحجز ليوم غد فقط
-  const bookingDateInput = document.getElementById("bookingDate");
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  bookingDateInput.valueAsDate = tomorrow;
-  bookingDateInput.min = tomorrow.toISOString().split("T")[0];
-  bookingDateInput.max = bookingDateInput.min;
+  // السماح بيوم غد فقط للحجز
+  function setupTomorrowDateOnly() {
+    const bookingDateInput = document.getElementById("bookingDate");
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const iso = tomorrow.toISOString().split("T")[0];
+    bookingDateInput.value = iso;
+    bookingDateInput.min = iso;
+    bookingDateInput.max = iso;
+  }
 
-  // ✅ إرسال الحجز إلى فايربيس
+  // إرسال الحجز إلى فايربيس
   document.getElementById("bookingForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const date = bookingDateInput.value;
+    const date = document.getElementById("bookingDate").value;
     const time = document.getElementById("bookingTime").value;
     const studio = document.getElementById("bookingStudio").value;
 
@@ -103,7 +115,7 @@
       .get();
 
     if (!existing.empty) {
-      alert("⚠️ يوجد حجز بالفعل في هذا الوقت في هذا الاستوديو.");
+      alert("⚠️ يوجد حجز في هذا الوقت بنفس الاستوديو.");
       return;
     }
 
@@ -120,7 +132,7 @@
     loadBookings();
   });
 
-  // ✅ عرض الحجوزات الخاصة بالمستخدم
+  // عرض الحجوزات
   async function loadBookings() {
     const list = document.getElementById("bookingsList");
     list.innerHTML = "";
@@ -158,7 +170,7 @@
       const cancelBtn = allowCancel ? `<button class="btn btn-sm btn-danger me-2" onclick="cancelBooking('${doc.id}')">إلغاء</button>` : "";
 
       const whatsappMsg = encodeURIComponent(
-        `مرحباً، أنا أستاذ وأرغب بحجز موعد بتاريخ ${data.date} بساعة ${data.time}`
+        `مرحباً، أريد حجز موعد بتاريخ ${data.date} بساعة ${data.time}`
       );
       const whatsappBtn = `<a target="_blank" href="https://wa.me/9647855002173?text=${whatsappMsg}" class="btn btn-sm btn-outline-success">📩 واتساب</a>`;
 
@@ -179,15 +191,15 @@
     });
   }
 
-  // ✅ إلغاء الحجز
+  // حذف الحجز
   async function cancelBooking(id) {
-    if (confirm("هل أنت متأكد من إلغاء هذا الحجز؟")) {
+    if (confirm("هل تريد فعلاً إلغاء الحجز؟")) {
       await db.collection("bookings").doc(id).delete();
       loadBookings();
     }
   }
 
-  // ✅ تحويل الوقت من 12 إلى 24
+  // تحويل الوقت من تنسيق 12 إلى 24
   function convertTo24H(timeStr) {
     const [time, modifier] = timeStr.split(" ");
     let [hours, minutes] = time.split(":");
@@ -200,7 +212,6 @@
     return `${hours}:${minutes}`;
   }
 </script>
-
-<!-- المنطق سيتم استكماله بعد قليل -->
 </body>
 </html>
+
