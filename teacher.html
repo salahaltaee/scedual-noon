@@ -65,7 +65,8 @@
     </div>
   </div>
 </div>
-<!-- Firebase إعداد -->
+
+<!-- ✅ منطق الصفحة -->
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
@@ -75,10 +76,8 @@
   firebase.initializeApp(firebaseConfig);
   const auth = firebase.auth();
   const db = firebase.firestore();
-
   let currentUser = null;
 
-  // التحقق من تسجيل الدخول
   auth.onAuthStateChanged(async (user) => {
     if (!user) {
       window.location.href = "index.html";
@@ -89,7 +88,6 @@
     }
   });
 
-  // السماح بيوم غد فقط للحجز
   function setupTomorrowDateOnly() {
     const bookingDateInput = document.getElementById("bookingDate");
     const tomorrow = new Date();
@@ -100,14 +98,12 @@
     bookingDateInput.max = iso;
   }
 
-  // إرسال الحجز إلى فايربيس
   document.getElementById("bookingForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const date = document.getElementById("bookingDate").value;
     const time = document.getElementById("bookingTime").value;
     const studio = document.getElementById("bookingStudio").value;
 
-    // تحقق من التكرار
     const existing = await db.collection("bookings")
       .where("date", "==", date)
       .where("time", "==", time)
@@ -132,7 +128,6 @@
     loadBookings();
   });
 
-  // عرض الحجوزات
   async function loadBookings() {
     const list = document.getElementById("bookingsList");
     list.innerHTML = "";
@@ -140,7 +135,7 @@
 
     const snapshot = await db.collection("bookings")
       .where("userId", "==", currentUser.uid)
-      .orderBy("date")
+      .orderBy("createdAt", "desc")
       .get();
 
     if (snapshot.empty) {
@@ -169,9 +164,7 @@
       const allowCancel = diffHours >= 12;
       const cancelBtn = allowCancel ? `<button class="btn btn-sm btn-danger me-2" onclick="cancelBooking('${doc.id}')">إلغاء</button>` : "";
 
-      const whatsappMsg = encodeURIComponent(
-        `مرحباً، أريد حجز موعد بتاريخ ${data.date} بساعة ${data.time}`
-      );
+      const whatsappMsg = encodeURIComponent(`مرحباً، أريد حجز موعد بتاريخ ${data.date} بساعة ${data.time}`);
       const whatsappBtn = `<a target="_blank" href="https://wa.me/9647855002173?text=${whatsappMsg}" class="btn btn-sm btn-outline-success">📩 واتساب</a>`;
 
       list.innerHTML += `
@@ -191,7 +184,6 @@
     });
   }
 
-  // حذف الحجز
   async function cancelBooking(id) {
     if (confirm("هل تريد فعلاً إلغاء الحجز؟")) {
       await db.collection("bookings").doc(id).delete();
@@ -199,7 +191,6 @@
     }
   }
 
-  // تحويل الوقت من تنسيق 12 إلى 24
   function convertTo24H(timeStr) {
     const [time, modifier] = timeStr.split(" ");
     let [hours, minutes] = time.split(":");
@@ -214,4 +205,3 @@
 </script>
 </body>
 </html>
-
