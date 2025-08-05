@@ -1,254 +1,142 @@
+<!-- صفحة الأستاذ - كاملة -->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <title>واجهة الأستاذ - Scudual</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <style>
-    .section {
-      max-width: 800px;
-      margin: 40px auto;
-    }
-    .badge-status {
-      font-size: 0.9rem;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>صفحة الأستاذ</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
+      authDomain: "scudual.firebaseapp.com",
+      projectId: "scudual",
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+  </script>
 </head>
 <body class="bg-light">
+<div class="container py-4">
+  <h3 id="greeting" class="mb-4 fw-bold">مرحباً أستاذ 👋</h3>
 
-<div class="container section">
-  <!-- ✅ الترحيب -->
-  <h3 class="text-center mb-4" id="teacherName">مرحبًا أستاذ</h3>
-
-  <!-- ✅ نموذج الحجز -->
-  <div class="card mb-4">
-    <div class="card-header bg-primary text-white">📅 حجز موعد</div>
-    <div class="card-body">
-      <form id="bookingForm">
-        <div class="mb-3">
-          <label class="form-label">📆 تاريخ الحجز</label>
-          <input type="date" id="bookingDate" class="form-control" required />
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body text-center">
+          <h5 class="card-title">🟢 حجز موعد</h5>
+          <p class="card-text">اضغط هنا لحجز موعد تصوير جديد.</p>
+          <button class="btn btn-success" onclick="showBookingForm()">احجز الآن</button>
         </div>
-        <div class="mb-3">
-          <label class="form-label">🕓 الوقت</label>
-          <select id="bookingTime" class="form-select" required>
-            <option value="">اختر الوقت</option>
-            <option>10:00 صباحًا</option>
-            <option>12:00 ظهرًا</option>
-            <option>2:00 مساءً</option>
-            <option>4:00 مساءً</option>
-            <option>6:00 مساءً</option>
-            <option>8:00 مساءً</option>
-            <option>10:00 مساءً</option>
-          </select>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">🎬 الاستوديو</label>
-          <select id="bookingStudio" class="form-select" required>
-            <option value="">اختر الاستوديو</option>
-            <option value="الرئيسي">📷 الرئيسي</option>
-            <option value="الثانوي">🎥 الثانوي</option>
-          </select>
-        </div>
-        <button type="submit" class="btn btn-success w-100">تثبيت الحجز</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ✅ قائمة الحجوزات -->
-  <div class="card">
-    <div class="card-header bg-secondary text-white">📋 حجوزاتي</div>
-    <div class="card-body" id="bookingsList">
-      <p class="text-muted">لا توجد حجوزات حالياً.</p>
-    </div>
-  </div>
-</div>
-
-<!-- ✅ Toast التنبيهات -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1055">
-  <div id="liveToast" class="toast bg-dark text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
-    <div class="d-flex">
-      <div class="toast-body" id="toastContent">
-        تم إشعارك بشيء جديد
       </div>
-      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-body text-center">
+          <h5 class="card-title">📋 حجوزاتي</h5>
+          <p class="card-text">عرض جميع الحجوزات الحالية والماضية.</p>
+          <button class="btn btn-primary" onclick="showMyBookings()">عرض الحجوزات</button>
+        </div>
+      </div>
     </div>
   </div>
+
+  <div id="dynamicContent" class="mt-5"></div>
 </div>
+
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
-    authDomain: "scudual.firebaseapp.com",
-    projectId: "scudual"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
   let currentUser = null;
+  let currentUserName = "أستاذ";
 
   auth.onAuthStateChanged(async (user) => {
     if (!user) {
-      window.location.href = "index.html";
-    } else {
-      currentUser = user;
-
-      // عرض اسم الأستاذ
-      const userDoc = await db.collection("users").doc(user.uid).get();
-      if (userDoc.exists) {
-        const name = userDoc.data().name || "بدون اسم";
-        document.getElementById("teacherName").textContent = `مرحبًا أستاذ ${name}`;
-      }
-
-      setupTomorrowDateOnly();
-      loadBookings();
+      location.href = "index.html";
+      return;
     }
+    currentUser = user;
+    const doc = await db.collection("users").doc(user.uid).get();
+    currentUserName = doc.data()?.name || "أستاذ";
+    document.getElementById("greeting").innerText = `مرحباً أستاذ ${currentUserName} 👋`;
   });
 
-  function setupTomorrowDateOnly() {
-    const bookingDateInput = document.getElementById("bookingDate");
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const iso = tomorrow.toISOString().split("T")[0];
-    bookingDateInput.value = iso;
-    bookingDateInput.min = iso;
-    bookingDateInput.max = iso;
+  function showBookingForm() {
+    const html = `
+      <div class="card p-4 shadow">
+        <h5 class="mb-3">🟢 نموذج الحجز</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">📅 تاريخ الموعد</label>
+            <input type="date" id="bookingDate" class="form-control" min="${getTomorrowDate()}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">⏰ وقت التصوير</label>
+            <select id="bookingTime" class="form-select">
+              <option value="">اختر الوقت</option>
+              <option value="08:00">08:00</option>
+              <option value="10:00">10:00</option>
+              <option value="12:00">12:00</option>
+              <option value="14:00">14:00</option>
+              <option value="16:00">16:00</option>
+              <option value="18:00">18:00</option>
+              <option value="20:00">20:00</option>
+              <option value="22:00">22:00</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">🎥 الاستوديو</label>
+            <select id="bookingStudio" class="form-select">
+              <option value="">اختر الاستوديو</option>
+              <option value="الرئيسي">📷 الرئيسي</option>
+              <option value="الثانوي">🎥 الثانوي</option>
+            </select>
+          </div>
+        </div>
+        <div class="text-end mt-3">
+          <button class="btn btn-success" onclick="submitBooking()">تثبيت الحجز</button>
+        </div>
+      </div>
+    `;
+    document.getElementById("dynamicContent").innerHTML = html;
   }
 
-  document.getElementById("bookingForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
+  function getTomorrowDate() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split("T")[0];
+  }
+
+  async function submitBooking() {
     const date = document.getElementById("bookingDate").value;
     const time = document.getElementById("bookingTime").value;
     const studio = document.getElementById("bookingStudio").value;
 
-    const existing = await db.collection("bookings")
+    if (!date || !time || !studio) return alert("يرجى تعبئة جميع الحقول");
+
+    const snap = await db.collection("bookings")
       .where("date", "==", date)
       .where("time", "==", time)
       .where("studio", "==", studio)
       .get();
 
-    if (!existing.empty) {
-      alert("⚠️ يوجد حجز في هذا الوقت بنفس الاستوديو.");
-      return;
-    }
+    if (!snap.empty) return alert("هذا الموعد محجوز بالفعل، اختر موعداً آخر");
 
     await db.collection("bookings").add({
       userId: currentUser.uid,
+      userName: currentUserName,
       date,
       time,
       studio,
       status: "pending",
-      createdAt: new Date()
+      createdAt: firebase.firestore.Timestamp.now()
     });
 
-    alert("✅ تم إرسال طلب الحجز!");
-    loadBookings();
-  });
-
-  async function loadBookings() {
-    const list = document.getElementById("bookingsList");
-    list.innerHTML = "";
-    const now = new Date();
-
-    const snapshot = await db.collection("bookings")
-      .where("userId", "==", currentUser.uid)
-      .orderBy("createdAt", "desc")
-      .get();
-
-    let sessionsPast = 0;
-
-    if (snapshot.empty) {
-      list.innerHTML = "<p class='text-muted'>لا توجد حجوزات حالياً.</p>";
-      return;
-    }
-
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      const bookingDateTime = new Date(`${data.date}T${convertTo24H(data.time)}`);
-      const diffHours = (bookingDateTime - now) / (1000 * 60 * 60);
-
-      // تنبيهات فورية:
-      if (data.status === "approved" && diffHours <= 5 && diffHours > 0) {
-        showToast(`⏰ لديك جلسة اليوم الساعة ${data.time} في استوديو ${data.studio}`, "warning");
-      }
-      if (data.status === "approved" && bookingDateTime < now) {
-        showToast(`❗ انتهى موعدك بتاريخ ${data.date} الساعة ${data.time}.`, "danger");
-        sessionsPast++;
-      }
-      if (data.status === "approved" && diffHours > 5 && diffHours < 24) {
-        showToast(`✅ تم تأكيد موعدك بتاريخ ${data.date} الساعة ${data.time}`, "success");
-      }
-
-      // عرض الحالة
-      let statusBadge = "";
-      if (data.status === "approved") {
-        if (diffHours > 5) {
-          statusBadge = `<span class="badge bg-success badge-status">نشط</span>`;
-        } else if (diffHours <= 5 && diffHours > 0) {
-          statusBadge = `<span class="badge bg-warning text-dark badge-status">قريب</span>`;
-        } else {
-          statusBadge = `<span class="badge bg-danger badge-status">انتهى</span>`;
-        }
-      } else {
-        statusBadge = `<span class="badge bg-secondary badge-status">قيد الانتظار</span>`;
-      }
-
-      const allowCancel = diffHours >= 12;
-      const cancelBtn = allowCancel ? `<button class="btn btn-sm btn-danger me-2" onclick="cancelBooking('${doc.id}')">إلغاء</button>` : "";
-
-      const whatsappMsg = encodeURIComponent(`مرحباً، أريد حجز موعد بتاريخ ${data.date} بساعة ${data.time}`);
-      const whatsappBtn = `<a href="https://wa.me/9647855002173?text=${whatsappMsg}" target="_blank" class="btn btn-sm btn-outline-success">📩 أرسل للواتساب</a>`;
-
-      list.innerHTML += `
-        <div class="border p-3 rounded mb-3 bg-white">
-          <div class="d-flex justify-content-between">
-            <div>
-              <strong>📅 ${data.date}</strong> - 🕓 ${data.time} - 🎬 ${data.studio}<br/>
-              ${statusBadge}
-            </div>
-            <div>
-              ${cancelBtn}
-              ${whatsappBtn}
-            </div>
-          </div>
-        </div>
-      `;
-    });
-
-    list.innerHTML = `<div class="mb-3 text-center text-muted">✅ عدد الجلسات السابقة: ${sessionsPast}</div>` + list.innerHTML;
-  }
-
-  async function cancelBooking(id) {
-    if (confirm("هل تريد فعلاً إلغاء الحجز؟")) {
-      await db.collection("bookings").doc(id).delete();
-      loadBookings();
-    }
-  }
-
-  function convertTo24H(timeStr) {
-    const [time, modifier] = timeStr.split(" ");
-    let [hours, minutes] = time.split(":");
-    if (modifier === "مساءً" && hours !== "12") {
-      hours = parseInt(hours) + 12;
-    }
-    if (modifier === "صباحًا" && hours === "12") {
-      hours = "00";
-    }
-    return `${hours}:${minutes}`;
-  }
-
-  function showToast(message, color = "dark") {
-    const toastEl = document.getElementById("liveToast");
-    const toastBody = document.getElementById("toastContent");
-
-    toastEl.className = `toast bg-${color} text-white border-0`;
-    toastBody.textContent = message;
-
-    const toast = new bootstrap.Toast(toastEl);
-    toast.show();
+    alert("تم إرسال طلب الحجز، بانتظار الموافقة ✅");
+    document.getElementById("dynamicContent").innerHTML = "";
   }
 </script>
 </body>
