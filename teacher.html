@@ -21,7 +21,7 @@
 </head>
 <body class="bg-light">
   <div class="container py-4">
-    <div id="greeting" class="mb-4 h4 fw-bold"></div>
+    <div id="greeting" class="mb-4 h4 fw-bold text-center"></div>
 
     <div class="row mb-4">
       <div class="col-md-6">
@@ -58,7 +58,7 @@
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label">📅 تاريخ الموعد</label>
-              <input type="date" id="bookingDate" class="form-control" min="${getTomorrowDate()}">
+              <input type="date" id="bookingDate" class="form-control" min="${getTomorrowDate()}" max="${getTomorrowDate()}">
             </div>
             <div class="col-md-4">
               <label class="form-label">⏰ وقت التصوير</label>
@@ -126,9 +126,10 @@
 
       db.collection("bookings")
         .where("userId", "==", uid)
+        .orderBy("date")
         .get()
         .then((snap) => {
-          let html = "<h5 class='mb-3'>📋 قائمة الحجوزات</h5>";
+          let html = `<h5 class='mb-3'>📋 قائمة الحجوزات للأستاذ ${currentUser.displayName}</h5>`;
           if (snap.empty) {
             html += "<div class='alert alert-warning'>لا توجد حجوزات بعد</div>";
           } else {
