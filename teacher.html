@@ -124,14 +124,19 @@
       const uid = currentUser?.uid;
       if (!uid) return;
 
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
       db.collection("bookings")
         .where("userId", "==", uid)
+        .where("date", "==", tomorrowStr)
         .orderBy("date")
         .get()
         .then((snap) => {
-          let html = `<h5 class='mb-3'>📋 قائمة الحجوزات للأستاذ ${currentUser.displayName}</h5>`;
+          let html = `<h5 class='mb-3'>📋 قائمة حجوزات الغد للأستاذ ${currentUser.displayName}</h5>`;
           if (snap.empty) {
-            html += "<div class='alert alert-warning'>لا توجد حجوزات بعد</div>";
+            html += "<div class='alert alert-warning'>لا توجد حجوزات ليوم الغد</div>";
           } else {
             snap.forEach((doc) => {
               const data = doc.data();
