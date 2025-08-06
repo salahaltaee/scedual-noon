@@ -41,7 +41,7 @@
     auth.onAuthStateChanged(user => {
       if (!user) location.href = 'index.html';
       currentUser = user;
-      document.getElementById("greeting").innerText = `مرحبا أستاذ ${user.displayName || ""}`;
+      document.getElementById("greeting").innerText = `مرحبا أستاذ ${user.displayName || "غير معروف"}`;
     });
 
     function getTomorrowDate() {
@@ -134,7 +134,7 @@
         .orderBy("date")
         .get()
         .then((snap) => {
-          let html = `<h5 class='mb-3'>📋 قائمة حجوزات الغد للأستاذ ${currentUser.displayName}</h5>`;
+          let html = `<h5 class='mb-3'>📋 قائمة حجوزات الغد للأستاذ ${currentUser.displayName || "غير معروف"}</h5>`;
           if (snap.empty) {
             html += "<div class='alert alert-warning'>لا توجد حجوزات ليوم الغد</div>";
           } else {
