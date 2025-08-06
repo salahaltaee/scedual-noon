@@ -38,10 +38,13 @@
   <script>
     let currentUser;
 
-    auth.onAuthStateChanged(user => {
+    auth.onAuthStateChanged(async user => {
       if (!user) location.href = 'index.html';
       currentUser = user;
-      document.getElementById("greeting").innerText = `مرحبا أستاذ ${user.displayName || "غير معروف"}`;
+      const userRef = await db.collection("users").doc(user.uid).get();
+      const userName = userRef.exists && userRef.data().name ? userRef.data().name : user.displayName || "غير معرف";
+      document.getElementById("greeting").innerText = `مرحبا أستاذ ${userName}`;
+      currentUser.displayName = userName;
     });
 
     function getTomorrowDate() {
