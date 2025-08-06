@@ -22,125 +22,124 @@
 </head>
 <body class="bg-light p-4">
   <div class="container">
-    <h3 class="mb-4 text-center fw-bold">📋 لوحة التحكم</h3>
+    <!-- Title -->
+    <h3 class="mb-4 text-center fw-bold">📋 لوحة تحكم المدير</h3>
 
-    <!-- Part 2: Filter Input -->
+    <!-- Filter -->
     <div class="mb-4">
       <label for="searchInput" class="form-label">🔍 فلترة حسب اسم الأستاذ</label>
       <input type="text" id="searchInput" class="form-control" placeholder="أدخل اسم الأستاذ للفلترة..." oninput="renderPendingBookings()">
     </div>
 
-    <!-- Part 3: Pending Bookings Section -->
-    <h5 class="mb-3">🕒 الطلبات الجديدة</h5>
+    <!-- Pending Bookings Section -->
+    <h5 class="mb-3">🕒 طلبات الحجوزات الجديدة</h5>
     <div id="pendingBookings"></div>
 
     <hr class="my-4">
 
-    <!-- Part 4: Weekly Schedule Table -->
+    <!-- Weekly Schedule -->
     <h5 class="mb-3">📆 جدول الأسبوع</h5>
     <div id="scheduleTable"></div>
   </div>
 
   <script>
-    // ===== Part 5: Auth State and Initial Render =====
+    // ===== Part 2: Auth Check and Initial Render =====
     auth.onAuthStateChanged(user => {
       if (!user) {
         window.location.href = 'index.html';
       } else {
-        renderPendingBookings();
-        renderScheduleTable();
+        // Ensure only admins
+        db.collection('users').doc(user.uid).get().then(doc => {
+          if (!doc.exists || doc.data().role !== 'admin') {
+            alert('لا تملك صلاحيات المشرف');
+            window.location.href = 'index.html';
+          } else {
+            renderPendingBookings();
+            renderScheduleTable();
+          }
+        });
       }
     });
 
-    // ===== Part 6: Render Pending Bookings with Filter & Actions =====
+    // ===== Part 3: Render Pending Bookings =====
     function renderPendingBookings() {
-      const searchValue = document.getElementById("searchInput").value.trim().toLowerCase();
-      db.collection("bookings")
-        .where("status", "==", "pending")
-        .orderBy("date")
+      const searchValue = document.getElementById('searchInput').value.trim().toLowerCase();
+      db.collection('bookings')
+        .where('status', '==', 'pending')
+        .orderBy('date')
         .get()
         .then(snapshot => {
-          let html = "";
-          if (snapshot.empty) {
-            html = "<div class='alert alert-secondary'>لا توجد طلبات جديدة</div>";
-          } else {
-            const now = new Date();
-            snapshot.forEach(doc => {
-              const data = doc.data();
-              const userName = data.userName || 'أستاذ';
-              if (searchValue && !userName.toLowerCase().includes(searchValue)) return;
-
-              const bookingDateTime = new Date(`${data.date}T${data.time}:00`);
-              const diffHours = (bookingDateTime - now) / (1000 * 60 * 60);
-              const isSoon = diffHours > 0 && diffHours <= 6;
-
-              html += `
-                <div class="card mb-3 shadow-sm ${isSoon ? 'border-warning' : ''}">
-                  <div class="card-body">
-                    <p><strong>الأستاذ:</strong> ${userName}</p>
-                    <p><strong>التاريخ:</strong> ${data.date}</p>
-                    <p><strong>الوقت:</strong> ${data.time}</p>
-                    <p><strong>الاستوديو:</strong> ${data.studio}</p>
-                    ${isSoon ? '<p class="text-warning fw-bold">⚠️ الموعد قريب جدًا (أقل من 6 ساعات)</p>' : ''}
-                    <div class="d-flex gap-2">
-                      <button class="btn btn-success btn-sm" onclick="updateStatus('${doc.id}','active')">✅ موافقة</button>
-                      <button class="btn btn-danger btn-sm" onclick="updateStatus('${doc.id}','rejected')">❌ رفض</button>
-                      <button class="btn btn-outline-danger btn-sm" onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
-                    </div>
+          let html = '';
+          const now = new Date();
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            const userName = data.userName || 'أستاذ';
+            if (searchValue && !userName.toLowerCase().includes(searchValue)) return;
+            const bookingDT = new Date(`${data.date}T${data.time}:00`);
+            const diffH = (bookingDT - now) / 36e5;
+            const isSoon = diffH > 0 && diffH <= 6;
+            html += `
+              <div class="card mb-3 shadow-sm ${isSoon ? 'border-warning' : ''}">
+                <div class="card-body">
+                  <p><strong>الأستاذ:</strong> ${userName}</p>
+                  <p><strong>التاريخ:</strong> ${data.date}</p>
+                  <p><strong>الوقت:</strong> ${data.time}</p>
+                  <p><strong>الاستوديو:</strong> ${data.studio}</p>
+                  ${isSoon ? '<p class="text-warning fw-bold">⚠️ الموعد قريب (أقل من 6 ساعات)</p>' : ''}
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-success btn-sm" onclick="updateStatus('${doc.id}','active')">✅ موافقة</button>
+                    <button class="btn btn-danger btn-sm" onclick="updateStatus('${doc.id}','rejected')">❌ رفض</button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
                   </div>
                 </div>
-              `;
-            });
-          }
-          document.getElementById("pendingBookings").innerHTML = html;
+              </div>
+            `;
+          });
+          if (!html) html = '<div class="alert alert-secondary">لا توجد طلبات جديدة</div>';
+          document.getElementById('pendingBookings').innerHTML = html;
         });
     }
 
     function updateStatus(id, status) {
-      db.collection("bookings").doc(id).update({ status }).then(() => {
+      db.collection('bookings').doc(id).update({ status }).then(() => {
         renderPendingBookings();
         renderScheduleTable();
       });
     }
 
     function deleteBooking(id) {
-      if (confirm("هل تريد حذف هذا الحجز؟")) {
-        db.collection("bookings").doc(id).delete().then(() => {
+      if (confirm('هل تريد حذف هذا الحجز؟')) {
+        db.collection('bookings').doc(id).delete().then(() => {
           renderPendingBookings();
           renderScheduleTable();
         });
       }
     }
 
-    // ===== Part 7: Render Weekly Schedule =====
-    function renderScheduleTable() {
+    // ===== Part 4: Render Weekly Schedule with Professor Names =====
+    async function renderScheduleTable() {
       const days = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-      const bookingsPerDay = {};
-      db.collection("bookings")
-        .where("status", "==", "active")
-        .get()
-        .then(snapshot => {
-          snapshot.forEach(doc => {
-            const d = doc.data();
-            const dayName = days[new Date(d.date).getDay()];
-            if (!bookingsPerDay[dayName]) bookingsPerDay[dayName] = [];
-            bookingsPerDay[dayName].push(`${d.userName || 'أستاذ'} - ${d.time} (${d.studio})`);
-          });
+      const usersSnap = await db.collection('users').where('role','==','teacher').get();
+      const usersMap = {};
+      usersSnap.forEach(u => usersMap[u.id] = u.data().name);
 
-          let tableHTML = `
-            <table class="table table-bordered bg-white">
-              <thead><tr><th>اليوم</th><th>الحجوزات</th></tr></thead>
-              <tbody>
-          `;
-          days.forEach(day => {
-            const list = bookingsPerDay[day] || [];
-            tableHTML += `
-              <tr><td class="fw-bold">${day}</td><td>${list.length ? list.join('<br>') : 'لا يوجد'}</td></tr>
-            `;
-          });
-          tableHTML += '</tbody></table>';
-          document.getElementById("scheduleTable").innerHTML = tableHTML;
-        });
+      const bookingsSnap = await db.collection('bookings').where('status','==','active').get();
+      const perDay = {};
+      bookingsSnap.forEach(b => {
+        const d = b.data();
+        const day = days[new Date(d.date).getDay()];
+        const prof = usersMap[d.userId] || d.userName || 'أستاذ';
+        perDay[day] = perDay[day] || [];
+        perDay[day].push(`${prof} - ${d.time} (${d.studio})`);
+      });
+
+      let tbl = '<table class="table table-bordered bg-white"><thead><tr><th>اليوم</th><th>الحجوزات</th></tr></thead><tbody>';
+      days.forEach(day => {
+        const list = perDay[day] || [];
+        tbl += `<tr><td class="fw-bold">${day}</td><td>${list.length ? list.join('<br>') : 'لا يوجد'}</td></tr>`;
+      });
+      tbl += '</tbody></table>';
+      document.getElementById('scheduleTable').innerHTML = tbl;
     }
   </script>
 </body>
