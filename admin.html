@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>لوحة الإدارة</title>
+  <title>صفحة الأستاذ</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -21,87 +21,155 @@
 </head>
 <body class="bg-light">
   <div class="container py-4">
-    <h3 class="mb-4 fw-bold">لوحة تحكم الإدارة</h3>
+    <div id="greeting" class="mb-4 h4 fw-bold text-center"></div>
 
-    <!-- طلبات الحجز بانتظار الموافقة -->
-    <div class="card mb-4">
-      <div class="card-header">طلبات الحجز</div>
-      <ul class="list-group list-group-flush" id="pendingList"></ul>
-    </div>
-
-    <!-- جدول توزيع الأيام -->
-    <div class="card">
-      <div class="card-header">📅 جدول الأسبوع حسب الأساتذة</div>
-      <div class="table-responsive">
-        <table class="table table-bordered table-striped">
-          <thead>
-            <tr>
-              <th>اسم الأستاذ</th>
-              <th>اليوم</th>
-              <th>التاريخ</th>
-              <th>الوقت</th>
-              <th>الاستوديو</th>
-              <th>الحالة</th>
-            </tr>
-          </thead>
-          <tbody id="weekTable"></tbody>
-        </table>
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <button class="btn btn-primary w-100" onclick="showBookingForm()">📅 حجز موعد</button>
+      </div>
+      <div class="col-md-6">
+        <button class="btn btn-secondary w-100" onclick="showMyBookings()">📋 حجوزاتي</button>
       </div>
     </div>
+
+    <div id="dynamicContent"></div>
   </div>
 
   <script>
-    auth.onAuthStateChanged(user => {
+    let currentUser;
+
+    auth.onAuthStateChanged(async user => {
       if (!user) location.href = 'index.html';
-      loadPendingRequests();
-      loadWeeklyTable();
+      currentUser = user;
+      const userRef = await db.collection("users").doc(user.uid).get();
+      const userName = userRef.exists && userRef.data().name ? userRef.data().name : user.displayName || "غير معرف";
+      document.getElementById("greeting").innerText = `مرحبا أستاذ ${userName}`;
+      currentUser.displayName = userName;
     });
 
-    async function loadPendingRequests() {
-      const snap = await db.collection("bookings").where("status", "==", "pending").get();
-      const list = document.getElementById("pendingList");
-      list.innerHTML = "";
-      snap.forEach(doc => {
-        const data = doc.data();
-        const li = document.createElement("li");
-        li.className = "list-group-item d-flex justify-content-between align-items-center";
-        li.innerHTML = `
-          <div>
-            <strong>${data.userName}</strong> طلب موعد في ${data.date} الساعة ${data.time} - ${data.studio}
-          </div>
-          <div>
-            <button class="btn btn-success btn-sm me-2" onclick="updateStatus('${doc.id}', 'active')">موافقة</button>
-            <button class="btn btn-danger btn-sm" onclick="updateStatus('${doc.id}', 'rejected')">رفض</button>
-          </div>
-        `;
-        list.appendChild(li);
-      });
+    function getTomorrowDate() {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow.toISOString().split("T")[0];
     }
 
-    async function updateStatus(id, status) {
-      await db.collection("bookings").doc(id).update({ status });
-      loadPendingRequests();
-      loadWeeklyTable();
+    function showBookingForm() {
+      const html = `
+        <div class="card p-4 shadow">
+          <h5 class="mb-3">🟢 نموذج الحجز</h5>
+          <p class="fw-bold">👤 الأستاذ: ${currentUser.displayName || "غير معروف"}</p>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">📅 تاريخ الموعد</label>
+              <input type="date" id="bookingDate" class="form-control" min="${getTomorrowDate()}" max="${getTomorrowDate()}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">⏰ وقت التصوير</label>
+              <select id="bookingTime" class="form-select">
+                <option value="">اختر الوقت</option>
+                <option value="08:00">08:00</option>
+                <option value="10:00">10:00</option>
+                <option value="12:00">12:00</option>
+                <option value="14:00">14:00</option>
+                <option value="16:00">16:00</option>
+                <option value="18:00">18:00</option>
+                <option value="20:00">20:00</option>
+                <option value="22:00">22:00</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">🎥 الاستوديو</label>
+              <select id="bookingStudio" class="form-select">
+                <option value="">اختر الاستوديو</option>
+                <option value="الرئيسي">📷 الرئيسي</option>
+                <option value="الثانوي">🎥 الثانوي</option>
+              </select>
+            </div>
+          </div>
+          <div class="text-end mt-3">
+            <button class="btn btn-success" onclick="submitBooking()">تثبيت الحجز</button>
+          </div>
+        </div>
+      `;
+      document.getElementById("dynamicContent").innerHTML = html;
     }
 
-    async function loadWeeklyTable() {
-      const snap = await db.collection("bookings").where("status", "in", ["active", "done"]).get();
-      const tbody = document.getElementById("weekTable");
-      tbody.innerHTML = "";
-      snap.forEach(doc => {
-        const d = doc.data();
-        const row = document.createElement("tr");
-        const dayName = new Date(d.date).toLocaleDateString("ar-EG", { weekday: 'long' });
-        row.innerHTML = `
-          <td>${d.userName}</td>
-          <td>${dayName}</td>
-          <td>${d.date}</td>
-          <td>${d.time}</td>
-          <td>${d.studio}</td>
-          <td>${d.status === 'active' ? '✅ نشط' : '✅ مكتمل'}</td>
-        `;
-        tbody.appendChild(row);
+    async function submitBooking() {
+      const date = document.getElementById("bookingDate").value;
+      const time = document.getElementById("bookingTime").value;
+      const studio = document.getElementById("bookingStudio").value;
+
+      if (!date || !time || !studio) return alert("يرجى ملء كل الحقول");
+
+      const existing = await db.collection("bookings")
+        .where("date", "==", date)
+        .where("time", "==", time)
+        .where("studio", "==", studio)
+        .get();
+
+      if (!existing.empty) return alert("⚠️ هذا الموعد محجوز مسبقًا");
+
+      await db.collection("bookings").add({
+        userId: currentUser.uid,
+        userName: currentUser.displayName || currentUser.email || "أستاذ غير معروف",
+        date,
+        time,
+        studio,
+        status: "pending",
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
+
+      alert("✅ تم إرسال الطلب بانتظار موافقة الإدارة");
+      showMyBookings();
+    }
+
+    function showMyBookings() {
+      const uid = currentUser?.uid;
+      if (!uid) return;
+
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+      db.collection("bookings")
+        .where("userId", "==", uid)
+        .where("date", "==", tomorrowStr)
+        .orderBy("date")
+        .get()
+        .then((snap) => {
+          let html = `<h5 class='mb-3'>📋 قائمة حجوزات الغد للأستاذ ${currentUser.displayName || "غير معروف"}</h5>`;
+          if (snap.empty) {
+            html += "<div class='alert alert-warning'>لا توجد حجوزات ليوم الغد</div>";
+          } else {
+            snap.forEach((doc) => {
+              const data = doc.data();
+              html += `
+                <div class="card mb-3 shadow-sm">
+                  <div class="card-body d-flex justify-content-between align-items-center">
+                    <div>
+                      <h6 class="fw-bold">👤 ${data.userName}</h6>
+                      <p class="mb-0">${data.date} - ${data.time} | 📍 ${data.studio} | الحالة: ${statusText(data.status)}</p>
+                    </div>
+                    <a class="btn btn-outline-success" href="https://wa.me/9647855002173?text=أريد%20حجز%20موعد%20بتاريخ%20${data.date}%20بساعة%20${data.time}" target="_blank">
+                      ارسال واتساب
+                    </a>
+                  </div>
+                </div>
+              `;
+            });
+          }
+          document.getElementById("dynamicContent").innerHTML = html;
+        });
+    }
+
+    function statusText(status) {
+      switch (status) {
+        case "pending": return "🟡 قيد الانتظار";
+        case "active": return "🟢 مؤكد";
+        case "done": return "🔴 منتهي";
+        case "rejected": return "❌ مرفوض";
+        default: return "❓ غير معروف";
+      }
     }
   </script>
 </body>
