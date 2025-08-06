@@ -125,7 +125,6 @@
 
       db.collection("bookings")
         .where("userId", "==", uid)
-        .orderBy("date")
         .get()
         .then((snap) => {
           let html = "<h5 class='mb-3'>📋 قائمة الحجوزات</h5>";
