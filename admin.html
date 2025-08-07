@@ -43,18 +43,27 @@
       </div>
     </div>
 
-    <!-- من يصور اليوم / غدٍ -->
+    <!-- من يصور اليوم -->
     <div class="card mb-4">
-      <div class="card-header bg-info text-white">📸 من يصور اليوم وغدٍ</div>
-      <div class="card-body">
-        <h6>📅 من يصور اليوم (حجوزات الغد)</h6>
-        <div id="shootToday" class="mb-3">
-          <p class="text-muted">جارٍ التحميل...</p>
-        </div>
-        <h6>📅 من يصور غدٍ (حجوزات بعد الغد)</h6>
-        <div id="shootTomorrow">
-          <p class="text-muted">جارٍ التحميل...</p>
-        </div>
+      <div class="card-header bg-primary text-white">📅 من يصور اليوم</div>
+      <div class="card-body" id="shootToday">
+        <p class="text-muted">جارٍ التحميل...</p>
+      </div>
+    </div>
+
+    <!-- من يصور غدٍ -->
+    <div class="card mb-4">
+      <div class="card-header bg-info text-white">📅 من يصور غدٍ</div>
+      <div class="card-body" id="shootTomorrow">
+        <p class="text-muted">جارٍ التحميل...</p>
+      </div>
+    </div>
+
+    <!-- من يصور بعد غدٍ -->
+    <div class="card mb-4">
+      <div class="card-header bg-secondary text-white">📅 من يصور بعد غدٍ</div>
+      <div class="card-body" id="shootDayAfterTomorrow">
+        <p class="text-muted">جارٍ التحميل...</p>
       </div>
     </div>
 
@@ -110,41 +119,38 @@
         ctr.innerHTML = html;
       } catch(e) {
         console.error('خطأ أثناء تحميل الطلبات:', e);
-        ctr.innerHTML = `<div class="alert alert-danger">فشل التحميل، تحقق من قواعد Firestore.</div>`;
+        ctr.innerHTML = `<div class="alert alert-danger">فشل التحميل.</div>`;
       }
     }
 
-    async function respondBooking(id,newStatus) {
-      if (newStatus==='rejected' && !confirm('تأكيد رفض الطلب؟')) return;
-      await db.collection('bookings').doc(id).update({ status:newStatus });
+    async function respondBooking(id, newStatus) {
+      if (newStatus === 'rejected' && !confirm('تأكيد رفض الطلب؟')) return;
+      await db.collection('bookings').doc(id).update({ status: newStatus });
       loadBookingRequests();
       loadShootRequests();
     }
     // ======== نهاية طلبات التصوير ========
 
-    // ======== من يصور اليوم / غدٍ ========
+    // ======== من يصور اليوم / غدٍ / بعد غدٍ ========
     async function loadShootRequests() {
-      // حجوزات الغد
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split('T')[0];
+      const today       = new Date();
+      const tomorrow    = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+      const dayAfter    = new Date(today); dayAfter.setDate(dayAfter.getDate() + 2);
 
-      // حجوزات بعد الغد
-      const dayAfter = new Date();
-      dayAfter.setDate(dayAfter.getDate() + 2);
-      const dayAfterStr = dayAfter.toISOString().split('T')[0];
+      const dates = [
+        { id: 'shootToday', date: today },
+        { id: 'shootTomorrow', date: tomorrow },
+        { id: 'shootDayAfterTomorrow', date: dayAfter }
+      ];
 
-      const snapT = await db.collection('bookings')
-        .where('status','==','active')
-        .where('date','==',tomorrowStr)
-        .get();
-      renderShootList('shootToday', snapT);
-
-      const snapA = await db.collection('bookings')
-        .where('status','==','active')
-        .where('date','==',dayAfterStr)
-        .get();
-      renderShootList('shootTomorrow', snapA);
+      for (const { id, date } of dates) {
+        const dateStr = date.toISOString().split('T')[0];
+        const snap = await db.collection('bookings')
+          .where('status','in',['active','approved'])
+          .where('date','==',dateStr)
+          .get();
+        renderShootList(id, snap);
+      }
     }
 
     function renderShootList(containerId, snapshot) {
@@ -163,7 +169,7 @@
       });
       ctr.innerHTML = html;
     }
-    // ======== نهاية من يصور اليوم/غدٍ ========
+    // ======== نهاية من يصور ========
 
     // ======== إدارة الأساتذة ========
     async function loadTeachers() {
