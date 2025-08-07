@@ -8,19 +8,19 @@
 
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 
   <script>
-    // تهيئة Firebase
+    // ✨ تأكد من استخدام مفتاح Firebase الصحيح
     const firebaseConfig = {
       apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
       authDomain: "scudual.firebaseapp.com",
       projectId: "scudual"
     };
     firebase.initializeApp(firebaseConfig);
-    const db   = firebase.firestore();
-    const auth = firebase.auth(); // نستخدمه لإضافة أساتذة جدد
+    const db = firebase.firestore();
+    const auth = firebase.auth(); // مستخدم لإضافة أساتذة جدد فقط
     let editId = null;
 
     window.onload = () => {
@@ -33,44 +33,41 @@
 <body class="bg-light py-4">
   <div class="container">
 
-    <h3 class="text-center mb-4">📋 لوحة التحكم</h3>
+    <h3 class="text-center mb-4">📋 لوحة التحكّم</h3>
 
-    <!-- ===== طلبات التصوير الجديدة ===== -->
+    <!-- قسم: طلبات التصوير الجديدة -->
     <div class="card mb-4">
       <div class="card-header bg-warning text-white">📥 طلبات التصوير الجديدة</div>
       <div class="card-body" id="bookingRequests">
         <p class="text-muted">جارٍ التحميل...</p>
       </div>
     </div>
-    <!-- ===== نهاية طلبات التصوير الجديدة ===== -->
 
-    <!-- ===== من يصور اليوم / باجر ===== -->
+    <!-- قسم: من يصور اليوم / باجر -->
     <div class="card mb-4">
       <div class="card-header bg-info text-white">📸 من يصور اليوم وغدٍ</div>
       <div class="card-body">
-        <h6>من يصور اليوم (حجوزات الغد)</h6>
+        <h6>📅 من يصور اليوم (حجوزات الغد)</h6>
         <div id="shootToday" class="mb-3"><p class="text-muted">جارٍ التحميل...</p></div>
-        <h6>من يصور باجر (حجوزات بعد غدٍ)</h6>
+        <h6>📅 من يصور باجر (حجوزات بعد غدٍ)</h6>
         <div id="shootTomorrow"><p class="text-muted">جارٍ التحميل...</p></div>
       </div>
     </div>
-    <!-- ===== نهاية من يصور ===== -->
 
-    <!-- ===== إدارة الأساتذة ===== -->
+    <!-- زر إضافة أستاذ -->
     <div class="mb-4 text-end">
       <button class="btn btn-success" onclick="showAddForm()">➕ إضافة أستاذ</button>
     </div>
 
+    <!-- نموذج الإضافة/التعديل -->
     <div id="formContainer"></div>
 
+    <!-- جدول الأساتذة -->
     <div class="table-responsive mb-5">
       <table class="table table-bordered table-striped text-center align-middle bg-white">
         <thead class="table-dark">
           <tr>
-            <th>الاسم</th>
-            <th>البريد الإلكتروني</th>
-            <th>الدور</th>
-            <th>إجراءات</th>
+            <th>الاسم</th><th>البريد الإلكتروني</th><th>الدور</th><th>إجراءات</th>
           </tr>
         </thead>
         <tbody id="teachersTable">
@@ -78,56 +75,66 @@
         </tbody>
       </table>
     </div>
-    <!-- ===== نهاية إدارة الأساتذة ===== -->
 
   </div>
 <script>
-  // ======== طلبات التصوير الجديدة ========
+  // ========= طلبات التصوير الجديدة =========
   async function loadBookingRequests() {
-    const ctr = document.getElementById('bookingRequests');
-    const snap = await db.collection('bookings').where('status','==','pending').orderBy('date').get();
-    if (snap.empty) {
-      ctr.innerHTML = `<div class="alert alert-secondary">لا توجد طلبات جديدة</div>`;
-      return;
+    console.log('تحميل طلبات التصوير...');
+    try {
+      const snap = await db.collection('bookings')
+        .where('status', '==', 'pending')
+        .orderBy('date')
+        .get();
+      const ctr = document.getElementById('bookingRequests');
+      if (snap.empty) {
+        ctr.innerHTML = `<div class="alert alert-secondary">لا توجد طلبات جديدة</div>`;
+        return;
+      }
+      let html = '';
+      snap.forEach(doc => {
+        const d = doc.data();
+        html += `
+          <div class="d-flex justify-content-between align-items-center p-3 mb-2 border rounded bg-white">
+            <div><strong>${d.userName}</strong> — ${d.date} — ${d.time} — ${d.studio}</div>
+            <div>
+              <button class="btn btn-sm btn-success me-2"
+                      onclick="respondBooking('${doc.id}','active')">✔ موافقة</button>
+              <button class="btn btn-sm btn-danger"
+                      onclick="respondBooking('${doc.id}','rejected')">✖ رفض</button>
+            </div>
+          </div>`;
+      });
+      ctr.innerHTML = html;
+    } catch (e) {
+      console.error('خطأ أثناء تحميل الطلبات:', e);
+      document.getElementById('bookingRequests').innerHTML =
+        `<div class="alert alert-danger">فشل التحميل، تحقق من قواعد Firestore.</div>`;
     }
-    let html = '';
-    snap.forEach(doc => {
-      const d = doc.data();
-      html += `
-        <div class="d-flex justify-content-between align-items-center p-3 mb-2 border rounded bg-white">
-          <div>
-            <strong>${d.userName || 'أستاذ'}</strong>
-            — ${d.date} — ${d.time} — ${d.studio}
-          </div>
-          <div>
-            <button class="btn btn-sm btn-success me-2"
-                    onclick="respondBooking('${doc.id}','active')">✔ موافقة</button>
-            <button class="btn btn-sm btn-danger"
-                    onclick="respondBooking('${doc.id}','rejected')">✖ رفض</button>
-          </div>
-        </div>`;
-    });
-    ctr.innerHTML = html;
   }
 
   async function respondBooking(id, newStatus) {
-    if (newStatus==='rejected' && !confirm('تأكيد رفض الطلب؟')) return;
+    if (newStatus === 'rejected' && !confirm('تأكيد رفض الطلب؟')) return;
     await db.collection('bookings').doc(id).update({ status: newStatus });
     loadBookingRequests();
     loadShootRequests();
   }
-  // ======== نهاية طلبات التصوير الجديدة ========
+  // =========================================
 
-  // ======== من يصور اليوم / باجر ========
+
+  // ========= من يصور اليوم / باجر =========
   async function loadShootRequests() {
-    const today    = new Date(), todayStr    = new Date(today.setDate(today.getDate()+1)).toISOString().split('T')[0];
-    const tomorrow = new Date(), tomorrowStr = new Date(tomorrow.setDate(tomorrow.getDate()+2)).toISOString().split('T')[0];
+    const today    = new Date();
+    const todayStr    = new Date(today.setDate(today.getDate()+1)).toISOString().split('T')[0];
+    const tomorrowStr = new Date(new Date().setDate(new Date().getDate()+2)).toISOString().split('T')[0];
 
-    const snapT = await db.collection('bookings').where('status','==','active').where('date','==',todayStr).get();
+    const snapT = await db.collection('bookings')
+      .where('status','==','active').where('date','==',todayStr).get();
     renderShootList('shootToday', snapT);
 
-    const snapTwo = await db.collection('bookings').where('status','==','active').where('date','==',tomorrowStr).get();
-    renderShootList('shootTomorrow', snapTwo);
+    const snap2 = await db.collection('bookings')
+      .where('status','==','active').where('date','==',tomorrowStr).get();
+    renderShootList('shootTomorrow', snap2);
   }
 
   function renderShootList(elId, snap) {
@@ -147,40 +154,43 @@
 
       html += `
         <div class="d-flex justify-content-between align-items-center mb-2 p-3 border rounded bg-white">
-          <div>
-            <strong>${d.userName}</strong> — ${d.date} — ${d.time} — ${d.studio} ${badge}
-          </div>
+          <div><strong>${d.userName}</strong> — ${d.date} — ${d.time} — ${d.studio} ${badge}</div>
         </div>`;
     });
     ctr.innerHTML = html;
   }
-  // ======== نهاية من يصور اليوم/باجر ========
+  // ======================================
 
 
-  // ======== إدارة الأساتذة ========
+  // ========= إدارة الأساتذة =========
   async function loadTeachers() {
     const tb = document.getElementById('teachersTable');
     tb.innerHTML = '';
-    const snap = await db.collection('users').where('role','==','teacher').get();
-    if (snap.empty) {
-      tb.innerHTML = '<tr><td colspan="4">لا يوجد أساتذة.</td></tr>';
-      return;
+    try {
+      const snap = await db.collection('users').where('role','==','teacher').get();
+      if (snap.empty) {
+        tb.innerHTML = '<tr><td colspan="4">لا يوجد أساتذة.</td></tr>';
+        return;
+      }
+      snap.forEach(doc => {
+        const { name,email,role } = doc.data();
+        tb.innerHTML += `
+          <tr>
+            <td>${name}</td>
+            <td>${email || '-'}</td>
+            <td>${role}</td>
+            <td>
+              <button class="btn btn-sm btn-primary me-1"
+                      onclick="showEditForm('${doc.id}','${name}','${email}','${role}')">✏️</button>
+              <button class="btn btn-sm btn-danger"
+                      onclick="deleteTeacher('${doc.id}')">🗑️</button>
+            </td>
+          </tr>`;
+      });
+    } catch(e) {
+      console.error('خطأ تحميل الأساتذة:', e);
+      tb.innerHTML = `<tr><td colspan="4">فشل التحميل</td></tr>`;
     }
-    snap.forEach(doc => {
-      const { name,email,role } = doc.data();
-      tb.innerHTML += `
-        <tr>
-          <td>${name}</td>
-          <td>${email||'-'}</td>
-          <td>${role}</td>
-          <td>
-            <button class="btn btn-sm btn-primary me-1"
-                    onclick="showEditForm('${doc.id}','${name}','${email}','${role}')">✏️</button>
-            <button class="btn btn-sm btn-danger"
-                    onclick="deleteTeacher('${doc.id}')">🗑️</button>
-          </td>
-        </tr>`;
-    });
   }
 
   function showAddForm() {
@@ -244,7 +254,7 @@
     await db.collection('users').doc(id).delete();
     loadTeachers();
   }
-  // ======== نهاية إدارة الأساتذة ========
+  // ===================================
 </script>
 </body>
 </html>
