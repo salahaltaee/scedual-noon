@@ -5,13 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>إدارة الأساتذة - Scudual</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <script>
+    // تهيئة Firebase (Auth + Firestore)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
+      authDomain: "scudual.firebaseapp.com",
+      projectId: "scudual"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+
+    let editId = null; // لمعرف التعديل
+
+    // يبدأ التحميل مباشرة عند فتح الصفحة
+    window.onload = () => {
+      loadTeachers();
+    };
+  </script>
 </head>
 <body class="bg-light py-4">
   <div class="container">
+
     <h3 class="text-center mb-4">👩‍🏫 إدارة الأساتذة</h3>
 
     <!-- زر إضافة أستاذ جديد -->
@@ -19,7 +40,7 @@
       <button class="btn btn-success" onclick="showAddForm()">➕ إضافة أستاذ</button>
     </div>
 
-    <!-- نموذج الإضافة/التعديل -->
+    <!-- حاوية نموذج الإضافة/التعديل -->
     <div id="formContainer"></div>
 
     <!-- جدول عرض الأساتذة -->
@@ -38,125 +59,121 @@
         </tbody>
       </table>
     </div>
+
   </div>
-<script>
-  // تهيئة Firebase
-  const firebaseConfig = {
-    apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
-    authDomain: "scudual.firebaseapp.com",
-    projectId: "scudual"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
 
-  let editId = null; // لتعقب حالة التعديل
-
-  auth.onAuthStateChanged(async user => {
-    if (!user) location.href = 'index.html'; 
-    await loadTeachers();
-  });
-
-  // 1. تحميل وعرض الأساتذة
-  async function loadTeachers() {
-    const tbody = document.getElementById('teachersTable');
-    tbody.innerHTML = '';
-    const snap = await db.collection('users').where('role', '==', 'teacher').get();
-    if (snap.empty) {
-      tbody.innerHTML = '<tr><td colspan="4">لا يوجد أساتذة مسجلين.</td></tr>';
-      return;
-    }
-    snap.forEach(doc => {
-      const { name, email, role } = doc.data();
-      tbody.innerHTML += `
-        <tr>
-          <td>${name}</td>
-          <td>${email}</td>
-          <td>${role}</td>
-          <td>
-            <button class="btn btn-sm btn-primary me-1" onclick="showEditForm('${doc.id}','${name}','${email}','${role}')">✏️ تعديل</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteTeacher('${doc.id}')">🗑️ حذف</button>
-          </td>
-        </tr>`;
-    });
-  }
-
-  // 2. إظهار نموذج الإضافة
-  function showAddForm() {
-    editId = null;
-    document.getElementById('formContainer').innerHTML = formHtml();
-  }
-
-  // 3. إظهار نموذج التعديل
-  function showEditForm(id, name, email, role) {
-    editId = id;
-    document.getElementById('formContainer').innerHTML = formHtml(name, email, role);
-  }
-
-  // 4. نموذج HTML للإضافة/التعديل
-  function formHtml(name = '', email = '', role = 'teacher') {
-    return `
-      <div class="card mb-4">
-        <div class="card-body">
-          <h5 class="card-title">${editId? 'تعديل أستاذ' : 'إضافة أستاذ جديد'}</h5>
-          <div class="row g-3">
-            <div class="col-md-4">
-              <input id="inpName" type="text" class="form-control" placeholder="الاسم" value="${name}" />
-            </div>
-            <div class="col-md-4">
-              <input id="inpEmail" type="email" class="form-control" placeholder="البريد الإلكتروني" value="${email}" ${editId? 'readonly' : ''} />
-            </div>
-            <div class="col-md-2">
-              <select id="inpRole" class="form-select">
-                <option value="teacher" ${role==='teacher'?'selected':''}>أستاذ</option>
-                <option value="admin" ${role==='admin'?'selected':''}>مدير</option>
-              </select>
-            </div>
-            <div class="col-md-2 text-end">
-              <button class="btn btn-${editId?'primary':'success'}" onclick="${editId?'updateTeacher()':'addTeacher()'}()">
-                ${editId? 'تحديث' : 'إضافة'}
+  <script>
+    // 1. تحميل وعرض الأساتذة
+    async function loadTeachers() {
+      const tbody = document.getElementById('teachersTable');
+      tbody.innerHTML = '';
+      const snap = await db.collection('users').where('role', '==', 'teacher').get();
+      if (snap.empty) {
+        tbody.innerHTML = '<tr><td colspan="4">لا يوجد أساتذة مسجلين.</td></tr>';
+        return;
+      }
+      snap.forEach(doc => {
+        const { name, email, role } = doc.data();
+        tbody.innerHTML += `
+          <tr>
+            <td>${name}</td>
+            <td>${email}</td>
+            <td>${role}</td>
+            <td>
+              <button class="btn btn-sm btn-primary me-1"
+                      onclick="showEditForm('${doc.id}','${name}','${email}','${role}')">
+                ✏️ تعديل
               </button>
+              <button class="btn btn-sm btn-danger"
+                      onclick="deleteTeacher('${doc.id}')">
+                🗑️ حذف
+              </button>
+            </td>
+          </tr>`;
+      });
+    }
+
+    // 2. إظهار نموذج الإضافة
+    function showAddForm() {
+      editId = null;
+      document.getElementById('formContainer').innerHTML = formHtml();
+    }
+
+    // 3. إظهار نموذج التعديل مع تعبئة البيانات
+    function showEditForm(id, name, email, role) {
+      editId = id;
+      document.getElementById('formContainer').innerHTML = formHtml(name, email, role);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 4. قالب نموذج HTML للإضافة/التعديل
+    function formHtml(name = '', email = '', role = 'teacher') {
+      return `
+        <div class="card mb-4 shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">${editId ? 'تعديل أستاذ' : 'إضافة أستاذ جديد'}</h5>
+            <div class="row g-3 align-items-end">
+              <div class="col-md-4">
+                <label class="form-label">الاسم</label>
+                <input id="inpName" type="text" class="form-control" value="${name}" />
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">البريد الإلكتروني</label>
+                <input id="inpEmail" type="email" class="form-control"
+                       value="${email}" ${editId ? 'readonly' : ''} />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label">الدور</label>
+                <select id="inpRole" class="form-select">
+                  <option value="teacher" ${role==='teacher'?'selected':''}>أستاذ</option>
+                  <option value="admin" ${role==='admin'?'selected':''}>مدير</option>
+                </select>
+              </div>
+              <div class="col-md-2 text-end">
+                <button class="btn btn-${editId?'primary':'success'} w-100"
+                        onclick="${editId?'updateTeacher()':'addTeacher()'}()">
+                  ${editId ? 'تحديث' : 'إضافة'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </div>`;
-  }
+        </div>`;
+    }
 
-  // 5. إضافة أستاذ (Auth + Firestore)
-  async function addTeacher() {
-    const name = document.getElementById('inpName').value.trim();
-    const email = document.getElementById('inpEmail').value.trim();
-    const role = document.getElementById('inpRole').value;
-    if (!name||!email) return alert('يرجى تعبئة الاسم والبريد');
-    const password = prompt('اختر كلمة مرور للأستاذ:','123456');
-    if (!password) return;
-    try {
-      const userCred = await auth.createUserWithEmailAndPassword(email, password);
-      await db.collection('users').doc(userCred.user.uid).set({ name, email, role });
+    // 5. إضافة أستاذ جديد (Auth + Firestore)
+    async function addTeacher() {
+      const name  = document.getElementById('inpName').value.trim();
+      const email = document.getElementById('inpEmail').value.trim();
+      const role  = document.getElementById('inpRole').value;
+      if (!name || !email) return alert('يرجى تعبئة الاسم والبريد');
+      const password = prompt('اختر كلمة مرور للأستاذ:','123456');
+      if (!password) return;
+      try {
+        const userCred = await auth.createUserWithEmailAndPassword(email, password);
+        await db.collection('users').doc(userCred.user.uid).set({ name, email, role });
+        document.getElementById('formContainer').innerHTML = '';
+        loadTeachers();
+      } catch (e) {
+        alert('خطأ: ' + e.message);
+      }
+    }
+
+    // 6. تحديث بيانات أستاذ (Firestore فقط)
+    async function updateTeacher() {
+      const name = document.getElementById('inpName').value.trim();
+      const role = document.getElementById('inpRole').value;
+      if (!name) return alert('يرجى تعبئة الاسم');
+      await db.collection('users').doc(editId).update({ name, role });
       document.getElementById('formContainer').innerHTML = '';
       loadTeachers();
-    } catch (e) {
-      alert('خطأ: '+e.message);
     }
-  }
 
-  // 6. تحديث بيانات أستاذ (Firestore فقط)
-  async function updateTeacher() {
-    const name = document.getElementById('inpName').value.trim();
-    const role = document.getElementById('inpRole').value;
-    if (!name) return alert('يرجى تعبئة الاسم');
-    await db.collection('users').doc(editId).update({ name, role });
-    document.getElementById('formContainer').innerHTML = '';
-    loadTeachers();
-  }
-
-  // 7. حذف أستاذ (Firestore فقط)
-  async function deleteTeacher(id) {
-    if (!confirm('هل متأكد من حذف هذا الأستاذ؟')) return;
-    await db.collection('users').doc(id).delete();
-    loadTeachers();
-  }
-</script>
-
+    // 7. حذف أستاذ (Firestore فقط)
+    async function deleteTeacher(id) {
+      if (!confirm('هل تريد حذف هذا الأستاذ؟')) return;
+      await db.collection('users').doc(id).delete();
+      loadTeachers();
+    }
+  </script>
 </body>
 </html>
