@@ -14,15 +14,15 @@
   <script>
     // تهيئة Firebase (Auth + Firestore)
     const firebaseConfig = {
-      apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
+      apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTUK",
       authDomain: "scudual.firebaseapp.com",
       projectId: "scudual"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    const auth = firebase.auth();
+    const auth = firebase.auth(); // لا يُستخدم لأي فحص دخول
 
-    let editId = null; // لمعرف التعديل
+    let editId = null; // لتعقب ما إذا كنا في وضع تعديل
 
     // يبدأ التحميل مباشرة عند فتح الصفحة
     window.onload = () => {
@@ -97,9 +97,10 @@
     function showAddForm() {
       editId = null;
       document.getElementById('formContainer').innerHTML = formHtml();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // 3. إظهار نموذج التعديل مع تعبئة البيانات
+    // 3. إظهار نموذج التعديل
     function showEditForm(id, name, email, role) {
       editId = id;
       document.getElementById('formContainer').innerHTML = formHtml(name, email, role);
@@ -145,7 +146,7 @@
       const name  = document.getElementById('inpName').value.trim();
       const email = document.getElementById('inpEmail').value.trim();
       const role  = document.getElementById('inpRole').value;
-      if (!name || !email) return alert('يرجى تعبئة الاسم والبريد');
+      if (!name || !email) return alert('يرجى تعبئة الاسم والبريد الإلكتروني');
       const password = prompt('اختر كلمة مرور للأستاذ:','123456');
       if (!password) return;
       try {
