@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>لوحة الإدارة - Scudual</title>
+  <title>لوحة التحكم - Scudual</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
   <!-- Firebase -->
@@ -12,7 +12,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // تهيئة Firebase (Auth + Firestore)
     const firebaseConfig = {
       apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
       authDomain: "scudual.firebaseapp.com",
@@ -20,14 +19,12 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    const auth = firebase.auth(); // نستخدم Auth لإنشاء أساتذة جدد
+    const auth = firebase.auth();
+    let editId = null;
 
-    let editId = null; // لتعقب ما إذا كنا في وضع تعديل
-
-    // يبدأ التحميل مباشرة عند فتح الصفحة
     window.onload = () => {
-      loadTeachers();
       loadShootRequests();
+      loadTeachers();
     };
   </script>
 </head>
@@ -40,27 +37,19 @@
     <div class="card mb-4">
       <div class="card-header bg-info text-white">📸 طلبات التصوير</div>
       <div class="card-body">
-        <h5 class="mb-2">من يصور اليوم</h5>
-        <div id="shootToday" class="mb-3">
-          <p class="text-muted">جارٍ التحميل...</p>
-        </div>
-        <h5 class="mb-2">من يصور باجر</h5>
-        <div id="shootTomorrow">
-          <p class="text-muted">جارٍ التحميل...</p>
-        </div>
+        <h5 class="mb-2">من يصور اليوم (حجوزات الغد)</h5>
+        <div id="shootToday" class="mb-3"><p class="text-muted">جارٍ التحميل...</p></div>
+        <h5 class="mb-2">من يصور باجر (حجوزات بعد غدٍ)</h5>
+        <div id="shootTomorrow"><p class="text-muted">جارٍ التحميل...</p></div>
       </div>
     </div>
-    <!-- ===== نهاية قسم طلبات التصوير ===== -->
+    <!-- ===== نهاية طلبات التصوير ===== -->
 
-    <!-- زر إضافة أستاذ جديد -->
+    <!-- إدارة الأساتذة -->
     <div class="mb-4 text-end">
       <button class="btn btn-success" onclick="showAddForm()">➕ إضافة أستاذ</button>
     </div>
-
-    <!-- حاوية نموذج الإضافة/التعديل -->
     <div id="formContainer"></div>
-
-    <!-- جدول عرض الأساتذة -->
     <div class="table-responsive mb-5">
       <table class="table table-bordered table-striped text-center align-middle bg-white">
         <thead class="table-dark">
@@ -78,197 +67,149 @@
     </div>
 
   </div>
+<script>
+  // ===== طلبات التصوير =====
+  async function loadShootRequests() {
+    const today = new Date();
+    const todayStr    = new Date(today.setDate(today.getDate()+1)).toISOString().split('T')[0];
+    const tomorrowStr = new Date(new Date().setDate(new Date().getDate()+2)).toISOString().split('T')[0];
 
-  <script>
-    // ======= طلبات التصوير =======
-    function makeDateTime(dateStr, timeRange) {
-      const start = timeRange.split('-')[0];
-      return new Date(`${dateStr}T${start}:00`);
+    const snapToday = await db.collection('bookings')
+      .where('status','==','active').where('date','==',todayStr).get();
+    renderShootList('shootToday', snapToday);
+
+    const snapTomorrow = await db.collection('bookings')
+      .where('status','==','active').where('date','==',tomorrowStr).get();
+    renderShootList('shootTomorrow', snapTomorrow);
+  }
+
+  function renderShootList(elId, snap) {
+    const ctr = document.getElementById(elId);
+    if (snap.empty) {
+      ctr.innerHTML = `<div class="alert alert-secondary">لا يوجد تصوير</div>`;
+      return;
     }
-
-    async function loadShootRequests() {
-      const today = new Date();
-      const todayStr    = today.toISOString().split('T')[0];
-      const tomorrow    = new Date(today);
-      tomorrow.setDate(tomorrow.getDate()+1);
-      const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-      const todaySnap = await db.collection('bookings')
-        .where('status', '==', 'active')
-        .where('date', '==', todayStr)
-        .get();
-      renderShootList('shootToday', todaySnap);
-
-      const tomSnap = await db.collection('bookings')
-        .where('status', '==', 'active')
-        .where('date', '==', tomorrowStr)
-        .get();
-      renderShootList('shootTomorrow', tomSnap);
-    }
-
-    function renderShootList(idContainer, snapshot) {
-      const container = document.getElementById(idContainer);
-      if (snapshot.empty) {
-        container.innerHTML = `<div class="alert alert-secondary">لا يوجد تصوير</div>`;
-        return;
+    let html = '';
+    snap.forEach(doc => {
+      const d = doc.data();
+      const status = d.shotStatus||'pending';
+      let badge='', btns='';
+      if (status==='pending') {
+        badge = `<span class="badge bg-secondary">قيد التنفيذ</span>`;
+        btns = `
+          <button class="btn btn-sm btn-success me-2"
+                  onclick="updateShotStatus('${doc.id}','shot')">✅ صور</button>
+          <button class="btn btn-sm btn-warning"
+                  onclick="updateShotStatus('${doc.id}','postponed')">⏳ أجل</button>`;
+      } else if (status==='shot') {
+        badge = `<span class="badge bg-success">تم التصوير</span>`;
+      } else {
+        badge = `<span class="badge bg-danger">تم التأجيل</span>`;
       }
-      let html = '';
-      snapshot.forEach(doc => {
-        const data = doc.data();
-        const shotStatus = data.shotStatus || 'pending';
-        let badge = '', btns = '';
-
-        if (shotStatus === 'pending') {
-          badge = `<span class="badge bg-secondary">قيد التنفيذ</span>`;
-          btns = `
-            <button class="btn btn-sm btn-success me-2"
-                    onclick="updateShotStatus('${doc.id}','shot')">
-              ✅ صور اليوم
-            </button>
-            <button class="btn btn-sm btn-warning"
-                    onclick="updateShotStatus('${doc.id}','postponed')">
-              ⏳ أجل التصوير
-            </button>`;
-        } else if (shotStatus === 'shot') {
-          badge = `<span class="badge bg-success">تم التصوير</span>`;
-        } else if (shotStatus === 'postponed') {
-          badge = `<span class="badge bg-danger">تم التأجيل</span>`;
-        }
-
-        html += `
-          <div class="d-flex justify-content-between align-items-center mb-2 p-3 border rounded bg-white">
-            <div>
-              <strong>${data.userName || 'أستاذ'}</strong> — ${data.time} — ${data.studio}
-              ${badge}
-            </div>
-            <div>${btns}</div>
-          </div>`;
-      });
-      container.innerHTML = html;
-    }
-
-    async function updateShotStatus(id, newStatus) {
-      await db.collection('bookings').doc(id).update({ shotStatus: newStatus });
-      loadShootRequests();
-    }
-    // ===== نهاية طلبات التصوير =======
-
-
-    // ======= إدارة الأساتذة =======
-
-    // 1. تحميل وعرض الأساتذة
-    async function loadTeachers() {
-      const tbody = document.getElementById('teachersTable');
-      tbody.innerHTML = '';
-      const snap = await db.collection('users').where('role', '==', 'teacher').get();
-      if (snap.empty) {
-        tbody.innerHTML = '<tr><td colspan="4">لا يوجد أساتذة مسجلين.</td></tr>';
-        return;
-      }
-      snap.forEach(doc => {
-        const { name, email, role } = doc.data();
-        tbody.innerHTML += `
-          <tr>
-            <td>${name}</td>
-            <td>${email}</td>
-            <td>${role}</td>
-            <td>
-              <button class="btn btn-sm btn-primary me-1"
-                      onclick="showEditForm('${doc.id}','${name}','${email}','${role}')">
-                ✏️ تعديل
-              </button>
-              <button class="btn btn-sm btn-danger"
-                      onclick="deleteTeacher('${doc.id}')">
-                🗑️ حذف
-              </button>
-            </td>
-          </tr>`;
-      });
-    }
-
-    // 2. إظهار نموذج الإضافة
-    function showAddForm() {
-      editId = null;
-      document.getElementById('formContainer').innerHTML = formHtml();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    // 3. إظهار نموذج التعديل مع تعبئة البيانات
-    function showEditForm(id, name, email, role) {
-      editId = id;
-      document.getElementById('formContainer').innerHTML = formHtml(name, email, role);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-    // 4. قالب نموذج HTML للإضافة/التعديل
-    function formHtml(name = '', email = '', role = 'teacher') {
-      return `
-        <div class="card mb-4 shadow-sm">
-          <div class="card-body">
-            <h5 class="card-title">${editId ? 'تعديل أستاذ' : 'إضافة أستاذ جديد'}</h5>
-            <div class="row g-3 align-items-end">
-              <div class="col-md-4">
-                <label class="form-label">الاسم</label>
-                <input id="inpName" type="text" class="form-control" value="${name}" />
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">البريد الإلكتروني</label>
-                <input id="inpEmail" type="email" class="form-control"
-                       value="${email}" ${editId ? 'readonly' : ''} />
-              </div>
-              <div class="col-md-2">
-                <label class="form-label">الدور</label>
-                <select id="inpRole" class="form-select">
-                  <option value="teacher" ${role==='teacher'?'selected':''}>أستاذ</option>
-                  <option value="admin" ${role==='admin'?'selected':''}>مدير</option>
-                </select>
-              </div>
-              <div class="col-md-2 text-end">
-                <button class="btn btn-${editId?'primary':'success'} w-100"
-                        onclick="${editId?'updateTeacher()':'addTeacher()'}()">
-                  ${editId ? 'تحديث' : 'إضافة'}
-                </button>
-              </div>
-            </div>
-          </div>
+      html += `
+        <div class="d-flex justify-content-between align-items-center mb-2 p-3 border rounded bg-white">
+          <div><strong>${d.userName}</strong> — ${d.date} — ${d.time} — ${d.studio} ${badge}</div>
+          <div>${btns}</div>
         </div>`;
-    }
+    });
+    ctr.innerHTML = html;
+  }
 
-    // 5. إضافة أستاذ جديد (Auth + Firestore)
-    async function addTeacher() {
-      const name  = document.getElementById('inpName').value.trim();
-      const email = document.getElementById('inpEmail').value.trim();
-      const role  = document.getElementById('inpRole').value;
-      if (!name || !email) return alert('يرجى تعبئة الاسم والبريد الإلكتروني');
-      const password = prompt('اختر كلمة مرور للأستاذ:','123456');
-      if (!password) return;
-      try {
-        const userCred = await auth.createUserWithEmailAndPassword(email, password);
-        await db.collection('users').doc(userCred.user.uid).set({ name, email, role });
-        document.getElementById('formContainer').innerHTML = '';
-        loadTeachers();
-      } catch (e) {
-        alert('خطأ: ' + e.message);
-      }
-    }
+  async function updateShotStatus(id,status) {
+    await db.collection('bookings').doc(id).update({ shotStatus: status });
+    loadShootRequests();
+  }
+  // ===== نهاية طلبات التصوير =====
 
-    // 6. تحديث بيانات أستاذ (Firestore فقط)
-    async function updateTeacher() {
-      const name = document.getElementById('inpName').value.trim();
-      const role = document.getElementById('inpRole').value;
-      if (!name) return alert('يرجى تعبئة الاسم');
-      await db.collection('users').doc(editId).update({ name, role });
-      document.getElementById('formContainer').innerHTML = '';
-      loadTeachers();
-    }
 
-    // 7. حذف أستاذ (Firestore فقط)
-    async function deleteTeacher(id) {
-      if (!confirm('هل تريد حذف هذا الأستاذ؟')) return;
-      await db.collection('users').doc(id).delete();
-      loadTeachers();
+  // ===== إدارة الأساتذة =====
+  async function loadTeachers() {
+    const tb = document.getElementById('teachersTable');
+    tb.innerHTML = '';
+    const snap = await db.collection('users').where('role','==','teacher').get();
+    if (snap.empty) {
+      tb.innerHTML = '<tr><td colspan="4">لا يوجد أساتذة.</td></tr>';
+      return;
     }
-    // ===== نهاية إدارة الأساتذة =======
-  </script>
+    snap.forEach(doc => {
+      const { name,email,role } = doc.data();
+      tb.innerHTML += `
+        <tr>
+          <td>${name}</td>
+          <td>${email||'-'}</td>
+          <td>${role}</td>
+          <td>
+            <button class="btn btn-sm btn-primary me-1"
+                    onclick="showEditForm('${doc.id}','${name}','${email}','${role}')">✏️</button>
+            <button class="btn btn-sm btn-danger"
+                    onclick="deleteTeacher('${doc.id}')">🗑️</button>
+          </td>
+        </tr>`;
+    });
+  }
+
+  function showAddForm() {
+    editId=null;
+    document.getElementById('formContainer').innerHTML = formHtml();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function showEditForm(id,name,email,role) {
+    editId=id;
+    document.getElementById('formContainer').innerHTML = formHtml(name,email,role);
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+
+  function formHtml(name='',email='',role='teacher') {
+    return `
+      <div class="card mb-4 shadow-sm"><div class="card-body">
+        <h5 class="card-title">${editId?'تعديل':'إضافة'} أستاذ</h5>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4"><label>الاسم</label>
+            <input id="inpName" class="form-control" value="${name}"></div>
+          <div class="col-md-4"><label>البريد الإلكتروني</label>
+            <input id="inpEmail" class="form-control" value="${email}" ${editId?'readonly':''}></div>
+          <div class="col-md-2"><label>الدور</label>
+            <select id="inpRole" class="form-select">
+              <option value="teacher" ${role==='teacher'?'selected':''}>أستاذ</option>
+              <option value="admin" ${role==='admin'?'selected':''}>مدير</option>
+            </select></div>
+          <div class="col-md-2 text-end">
+            <button class="btn btn-${editId?'primary':'success'} w-100"
+                    onclick="${editId?'updateTeacher()':'addTeacher()'}()">
+              ${editId?'تحديث':'إضافة'}
+            </button>
+          </div>
+        </div>
+      </div></div>`;
+  }
+
+  async function addTeacher() {
+    const name  = document.getElementById('inpName').value.trim();
+    const email = document.getElementById('inpEmail').value.trim();
+    const role  = document.getElementById('inpRole').value;
+    if(!name||!email) return alert('أكمل الحقول');
+    const pwd = prompt('كلمة مرور:','123456'); if(!pwd) return;
+    const uc = await auth.createUserWithEmailAndPassword(email,pwd);
+    await db.collection('users').doc(uc.user.uid).set({ name,email,role });
+    document.getElementById('formContainer').innerHTML='';
+    loadTeachers();
+  }
+
+  async function updateTeacher() {
+    const name=document.getElementById('inpName').value.trim();
+    const role=document.getElementById('inpRole').value;
+    if(!name)return alert('أكمل الاسم');
+    await db.collection('users').doc(editId).update({ name,role });
+    document.getElementById('formContainer').innerHTML='';
+    loadTeachers();
+  }
+
+  async function deleteTeacher(id) {
+    if(!confirm('تأكيد الحذف؟'))return;
+    await db.collection('users').doc(id).delete();
+    loadTeachers();
+  }
+  // ===== نهاية إدارة الأساتذة =====
+</script>
 </body>
 </html>
