@@ -55,6 +55,7 @@
       loadShootRequests();
       loadTeachers();
       loadTeachersForRecurring();
+      loadTeachersForManual();  // تعبئة قائمة الأساتذة في الحجز اليدوي
       initMonthPicker();       // للسكشن الجديد أسفل الصفحة
       loadMonthlyBookings();   // تحميل الشهر الحالي افتراضياً
     };
@@ -215,6 +216,50 @@
       </div>
     </div>
     <!-- نهاية حجوزات الشهر -->
+
+    <!-- ====== إضافة حجز يدوي (أي تاريخ) ====== -->
+    <div class="card mb-4">
+      <div class="card-header bg-warning-subtle">➕ إضافة حجز يدوي</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">التاريخ</label>
+            <input type="date" id="manualDate" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">الأستاذ</label>
+            <select id="manualTeacher" class="form-select">
+              <option value="">جاري التحميل...</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">الاستوديو</label>
+            <select id="manualStudio" class="form-select">
+              <option value="الرئيسي">الرئيسي</option>
+              <option value="الثانوي">الثانوي</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">الفترة الزمنية</label>
+            <select id="manualTime" class="form-select">
+              <option value="">اختر الفترة</option>
+              <option value="10:00-12:00">10:00 - 12:00</option>
+              <option value="12:00-14:00">12:00 - 14:00</option>
+              <option value="14:00-16:00">14:00 - 16:00</option>
+              <option value="16:00-18:00">16:00 - 18:00</option>
+              <option value="18:00-20:00">18:00 - 20:00</option>
+              <option value="20:00-22:00">20:00 - 22:00</option>
+              <option value="22:00-00:00">22:00 - 00:00</option>
+            </select>
+          </div>
+          <div class="col-md-3 d-flex align-items-end">
+            <button class="btn btn-outline-primary w-100" onclick="createManualBooking()">تثبيت الحجز</button>
+          </div>
+        </div>
+        <div id="manualResult" class="mt-3"></div>
+      </div>
+    </div>
+    <!-- ====== نهاية إضافة حجز يدوي ====== -->
 
   </div>
 
@@ -529,6 +574,7 @@
       document.getElementById('formContainer').innerHTML = '';
       loadTeachers();
       loadTeachersForRecurring();
+      loadTeachersForManual();
     }
     async function updateTeacher() {
       const name = document.getElementById('inpName').value.trim();
@@ -537,13 +583,95 @@
       document.getElementById('formContainer').innerHTML = '';
       loadTeachers();
       loadTeachersForRecurring();
+      loadTeachersForManual();
     }
     async function deleteTeacher(id) {
       if (!confirm('تأكيد حذف الأستاذ؟')) return;
       await db.collection('users').doc(id).delete();
       loadTeachers();
       loadTeachersForRecurring();
+      loadTeachersForManual();
     }
+
+    // ======== تعبئة أساتذة الحجز اليدوي وإنشاء الحجز ========
+    async function loadTeachersForManual() {
+      const sel = document.getElementById('manualTeacher');
+      sel.innerHTML = `<option value="">جاري التحميل...</option>`;
+      try {
+        const snap = await db.collection('users').where('role','==','teacher').get();
+        if (snap.empty) { sel.innerHTML = `<option value="">لا يوجد أساتذة</option>`; return; }
+        let html = `<option value="">اختر الأستاذ</option>`;
+        snap.forEach(d => { html += `<option value="${d.id}">${d.data().name}</option>`; });
+        sel.innerHTML = html;
+      } catch (e) {
+        console.error('خطأ تحميل قائمة الأساتذة للحجز اليدوي:', e);
+        sel.innerHTML = `<option value="">خطأ في التحميل</option>`;
+      }
+    }
+
+    async function createManualBooking() {
+      const dateStr   = document.getElementById('manualDate').value;   // yyyy-mm-dd من input date
+      const teacherId = document.getElementById('manualTeacher').value;
+      const studio    = document.getElementById('manualStudio').value;
+      const timeRange = document.getElementById('manualTime').value;
+      const box       = document.getElementById('manualResult');
+
+      box.className = 'mt-3';
+      box.innerHTML = '';
+
+      if (!dateStr || !teacherId || !studio || !timeRange) {
+        box.classList.add('text-danger');
+        box.textContent = 'يرجى اختيار التاريخ، الأستاذ، الفترة الزمنية، والاستوديو.';
+        return;
+      }
+
+      try {
+        // اسم الأستاذ
+        const tDoc = await db.collection('users').doc(teacherId).get();
+        const teacherName = tDoc.exists ? (tDoc.data().name || 'أستاذ') : 'أستاذ';
+
+        // منع التكرار: (date/time/studio)
+        const exist = await db.collection('bookings')
+          .where('date','==',dateStr)
+          .where('time','==',timeRange)
+          .where('studio','==',studio)
+          .get();
+        if (!exist.empty) {
+          box.classList.add('text-warning');
+          box.textContent = '⚠️ هذا الموعد محجوز مسبقاً لنفس التاريخ/الوقت/الاستوديو.';
+          return;
+        }
+
+        await db.collection('bookings').add({
+          userId: teacherId,
+          userName: teacherName,
+          date: dateStr,
+          time: timeRange,               // نخزن 24 ساعة ونعرض 12 ساعة
+          studio,
+          status: 'active',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        box.classList.add('text-success');
+        box.textContent = '✅ تم تثبيت الحجز بنجاح.';
+
+        // تحديث القوائم
+        loadShootRequests();
+        loadMonthlyBookings();
+        loadBookingRequests();
+
+        // إعادة تعيين الحقول
+        // document.getElementById('manualDate').value = '';
+        document.getElementById('manualTeacher').value = '';
+        document.getElementById('manualTime').value = '';
+        document.getElementById('manualStudio').value = 'الرئيسي';
+      } catch (e) {
+        console.error('خطأ إنشاء الحجز اليدوي:', e);
+        box.classList.add('text-danger');
+        box.textContent = 'حدث خطأ أثناء إنشاء الحجز.';
+      }
+    }
+    // ======== نهاية الحجز اليدوي ========
   </script>
 </body>
 </html>
