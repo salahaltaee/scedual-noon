@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>دليل الروابط - Scudual</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body { background:#f8f9fa }
+    .link-btn { font-size:1.05rem; padding:12px 16px; }
+    .link-card { transition:.15s; }
+    .link-card:hover { transform: translateY(-2px); }
+    .truncate { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; display:inline-block; vertical-align:bottom; }
+  </style>
+
+  <script>
+    // تهيئة Firebase (نفس مشروعك)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
+      authDomain: "scudual.firebaseapp.com",
+      projectId: "scudual"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // أدوات مساعدة
+    function normalizeUrl(u){
+      if(!u) return '';
+      // لو ماكو بروتوكول، نضيف https://
+      if(!/^https?:\/\//i.test(u)) u = 'https://' + u;
+      return u.trim();
+    }
+    function isValidUrl(u){
+      try { new URL(u); return true; } catch { return false; }
+    }
+
+    // تحميل الروابط المخصصة
+    async function loadCustomLinks(){
+      const wrap = document.getElementById('customLinks');
+      wrap.innerHTML = `<div class="text-muted">جارٍ التحميل...</div>`;
+      try{
+        const snap = await db.collection('links').orderBy('createdAt','desc').get();
+        if(snap.empty){
+          wrap.innerHTML = `<div class="alert alert-secondary">لا توجد روابط مضافة بعد.</div>`;
+          return;
+        }
+        let html = '';
+        snap.forEach(doc=>{
+          const d = doc.data();
+          const url = d.url || '';
+          const title = d.title || 'رابط';
+          html += `
+            <div class="d-flex align-items-center justify-content-between p-3 mb-2 border rounded bg-white link-card">
+              <div class="me-2">
+                <div class="fw-bold truncate">${title}</div>
+                <div class="text-muted small truncate">${url}</div>
+              </div>
+              <div class="d-flex gap-2">
+                <a class="btn btn-primary btn-sm" href="${url}" target="_blank" rel="noopener">فتح</a>
+                <button class="btn btn-outline-danger btn-sm" onclick="deleteLink('${doc.id}')">حذف</button>
+              </div>
+            </div>`;
+        });
+        wrap.innerHTML = html;
+      }catch(err){
+        console.error('loadCustomLinks error', err);
+        wrap.innerHTML = `<div class="alert alert-danger">فشل تحميل الروابط.</div>`;
+      }
+    }
+
+    // إضافة رابط جديد
+    async function addLink(){
+      const titleEl = document.getElementById('linkTitle');
+      const urlEl   = document.getElementById('linkUrl');
+      const resEl   = document.getElementById('addResult');
+
+      let title = (titleEl.value || '').trim();
+      let url   = normalizeUrl(urlEl.value || '');
+
+      resEl.className = 'mt-2';
+      resEl.innerHTML = '';
+
+      if(!title || !url){
+        resEl.classList.add('text-danger');
+        resEl.textContent = 'الرجاء إدخال اسم الزر والرابط.';
+        return;
+      }
+      if(!isValidUrl(url)){
+        resEl.classList.add('text-danger');
+        resEl.textContent = 'الرابط غير صالح.';
+        return;
+      }
+
+      try{
+        // منع تكرار على أساس نفس الرابط
+        const exist = await db.collection('links').where('url','==',url).get();
+        if(!exist.empty){
+          resEl.classList.add('text-warning');
+          resEl.textContent = 'هذا الرابط موجود مسبقاً.';
+          return;
+        }
+        await db.collection('links').add({
+          title, url,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        resEl.classList.add('text-success');
+        resEl.textContent = 'تمت إضافة الرابط بنجاح.';
+        titleEl.value = ''; urlEl.value = '';
+        loadCustomLinks();
+      }catch(err){
+        console.error('addLink error', err);
+        resEl.classList.add('text-danger');
+        resEl.textContent = 'فشل حفظ الرابط.';
+      }
+    }
+
+    // حذف رابط
+    async function deleteLink(id){
+      if(!confirm('تأكيد حذف هذا الرابط؟')) return;
+      try{
+        await db.collection('links').doc(id).delete();
+        loadCustomLinks();
+      }catch(err){
+        console.error('deleteLink error', err);
+        alert('تعذر حذف الرابط.');
+      }
+    }
+
+    window.onload = () => {
+      loadCustomLinks();
+    };
+  </script>
+</head>
+<body>
+  <div class="container py-4">
+    <h3 class="text-center mb-4">🔗 دليل الروابط</h3>
+
+    <!-- روابط ثابتة -->
+    <div class="card mb-4">
+      <div class="card-header bg-dark text-white">روابط أساسية</div>
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-md-6 col-lg-3">
+            <a href="https://salahaltaee.github.io/scedual-noon/index.html" target="_blank" class="btn btn-primary w-100 link-btn">حجز الموعد</a>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <a href="https://salahaltaee.github.io/scedual-noon/admin.html" target="_blank" class="btn btn-secondary w-100 link-btn">لوحة التحكم</a>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <a href="https://salahaltaee.github.io/noonscudul/" target="_blank" class="btn btn-success w-100 link-btn">تسجيل حضور</a>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <a href="https://salahaltaee.github.io/noonscudul/editor.html" target="_blank" class="btn btn-info w-100 link-btn">لوحة المونتير</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- روابط مخصصة من Firestore -->
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">أزراري المخصصة</div>
+      <div class="card-body" id="customLinks">
+        <div class="text-muted">جارٍ التحميل...</div>
+      </div>
+    </div>
+
+    <!-- إضافة زر جديد -->
+    <div class="card">
+      <div class="card-header bg-warning-subtle">➕ إضافة زر رابط جديد</div>
+      <div class="card-body">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-5">
+            <label class="form-label">اسم الزر</label>
+            <input id="linkTitle" class="form-control" placeholder="مثال: نظام الرواتب">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">الرابط</label>
+            <input id="linkUrl" class="form-control" placeholder="مثال: https://example.com">
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-success w-100" onclick="addLink()">إضافة</button>
+          </div>
+        </div>
+        <div id="addResult" class="mt-2 small"></div>
+      </div>
+    </div>
+
+    <div class="text-center text-muted mt-4 small">© استوديو نون</div>
+  </div>
+</body>
+</html>
