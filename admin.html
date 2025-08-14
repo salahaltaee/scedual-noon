@@ -73,6 +73,42 @@
         <p class="text-muted">جارٍ التحميل...</p>
       </div>
     </div>
+<!-- زر الطباعة -->
+<div class="mb-3 text-end">
+  <button class="btn btn-outline-primary" onclick="printTodayBookings()">🖨 طباعة حجوزات اليوم</button>
+</div>
+
+<!-- من يصور اليوم -->
+<div class="card mb-4">
+  <div class="card-header bg-primary text-white">📅 من يصور اليوم</div>
+  <div class="card-body" id="shootToday">
+    <p class="text-muted">جارٍ التحميل...</p>
+  </div>
+</div>
+
+<script>
+  function printTodayBookings() {
+    const todaySection = document.getElementById('shootToday').innerHTML;
+    const printWindow = window.open('', '', 'width=800,height=600');
+    printWindow.document.write(`
+      <html lang="ar" dir="rtl">
+        <head>
+          <title>طباعة حجوزات اليوم</title>
+          <style>
+            body { font-family: Arial, sans-serif; direction: rtl; text-align: right; }
+            .booking { padding: 10px; border-bottom: 1px solid #ccc; }
+          </style>
+        </head>
+        <body>
+          <h2>📅 حجوزات اليوم</h2>
+          ${todaySection}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  }
+</script>
 
     <!-- من يصور اليوم -->
     <div class="card mb-4">
