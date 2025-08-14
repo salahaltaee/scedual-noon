@@ -12,7 +12,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // تهيئة Firebase
+    // Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
       authDomain: "scudual.firebaseapp.com",
@@ -26,10 +26,11 @@
     window.onload = () => {
       loadBookingRequests();
       loadShootRequests();
-      loadTeachers();
+      loadTeachers();            // للجدول
+      loadTeachersForRecurring(); // لسيليكتر الحجز الثابت
     };
 
-    // ====== أدوات مساعدة لتنسيق الوقت 12 ساعة ======
+    // أدوات تنسيق الوقت 12 ساعة للعرض فقط
     function to12h(one) {
       let [h, m] = one.split(':').map(Number);
       const suffix = h >= 12 ? 'م' : 'ص';
@@ -80,6 +81,79 @@
       </div>
     </div>
 
+    <!-- حجز ثابت شهري -->
+    <div class="card mb-4">
+      <div class="card-header bg-success text-white">📆 حجز ثابت شهري</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <!-- الشهر -->
+          <div class="col-md-3">
+            <label class="form-label">الشهر</label>
+            <select id="recMonth" class="form-select">
+              <option value="8">شهر 8 (آب)</option>
+              <option value="9">شهر 9 (أيلول)</option>
+              <option value="10">شهر 10 (تشرين الأول)</option>
+              <option value="11">شهر 11 (تشرين الثاني)</option>
+              <option value="12">شهر 12 (كانون الأول)</option>
+            </select>
+          </div>
+          <!-- الأستاذ -->
+          <div class="col-md-4">
+            <label class="form-label">الأستاذ</label>
+            <select id="recTeacher" class="form-select">
+              <option value="">جاري التحميل...</option>
+            </select>
+          </div>
+          <!-- الاستوديو -->
+          <div class="col-md-3">
+            <label class="form-label">الاستوديو</label>
+            <select id="recStudio" class="form-select">
+              <option value="الرئيسي">الرئيسي</option>
+              <option value="الثانوي">الثانوي</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- أيام الأسبوع -->
+        <div class="mt-3">
+          <label class="form-label d-block">أيام الأسبوع (يمكن اختيار أكثر من يوم)</label>
+          <div class="d-flex flex-wrap gap-2">
+            <!-- ملاحظة: أرقام الأيام حسب JS: الأحد=0 ... السبت=6 -->
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-sat" value="6"><label class="form-check-label" for="w-sat">السبت</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-sun" value="0"><label class="form-check-label" for="w-sun">الأحد</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-mon" value="1"><label class="form-check-label" for="w-mon">الإثنين</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-tue" value="2"><label class="form-check-label" for="w-tue">الثلاثاء</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-wed" value="3"><label class="form-check-label" for="w-wed">الأربعاء</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-thu" value="4"><label class="form-check-label" for="w-thu">الخميس</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-fri" value="5"><label class="form-check-label" for="w-fri">الجمعة</label></div>
+          </div>
+        </div>
+
+        <!-- الوقت -->
+        <div class="row g-3 mt-2">
+          <div class="col-md-4">
+            <label class="form-label">الفترة الزمنية</label>
+            <select id="recTime" class="form-select">
+              <option value="">اختر الفترة</option>
+              <option value="10:00-12:00">10:00 - 12:00</option>
+              <option value="12:00-14:00">12:00 - 14:00</option>
+              <option value="14:00-16:00">14:00 - 16:00</option>
+              <option value="16:00-18:00">16:00 - 18:00</option>
+              <option value="18:00-20:00">18:00 - 20:00</option>
+              <option value="20:00-22:00">20:00 - 22:00</option>
+              <option value="22:00-00:00">22:00 - 00:00</option>
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button class="btn btn-success w-100" onclick="createMonthlyRecurring()">تثبيت الحجز الثابت</button>
+          </div>
+        </div>
+
+        <div id="recResult" class="mt-3"></div>
+      </div>
+    </div>
+    <!-- نهاية حجز ثابت شهري -->
+
     <!-- إدارة الأساتذة -->
     <div class="mb-4 text-end">
       <button class="btn btn-success" onclick="showAddForm()">➕ إضافة أستاذ</button>
@@ -122,10 +196,8 @@
             <div class="d-flex justify-content-between align-items-center p-3 mb-2 border rounded bg-white">
               <div><strong>${d.userName}</strong> — ${d.date} — ${rangeTo12h(d.time)} — ${d.studio}</div>
               <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-success"
-                        onclick="approveBooking('${doc.id}')">✔ موافقة</button>
-                <button class="btn btn-sm btn-outline-danger"
-                        onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
+                <button class="btn btn-sm btn-success" onclick="approveBooking('${doc.id}')">✔ موافقة</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
               </div>
             </div>`;
         });
@@ -135,22 +207,17 @@
         ctr.innerHTML = `<div class="alert alert-danger">فشل التحميل.</div>`;
       }
     }
-
-    // موافقة = تحويل الحالة إلى active
     async function approveBooking(id) {
       await db.collection('bookings').doc(id).update({ status: 'active' });
       loadBookingRequests();
       loadShootRequests();
     }
-
-    // رفض (حذف) = إزالة المستند نهائياً
     async function deleteBooking(id) {
-      if (!confirm('تأكيد حذف الموعد؟ سيتم تحرير هذا الوقت للحجز من جديد.')) return;
+      if (!confirm('تأكيد حذف الموعد؟')) return;
       await db.collection('bookings').doc(id).delete();
       loadBookingRequests();
       loadShootRequests();
     }
-    // ======== نهاية طلبات التصوير ========
 
     // ======== من يصور اليوم / غدٍ / بعد غدٍ ========
     async function loadShootRequests() {
@@ -173,7 +240,6 @@
         renderShootList(id, snap);
       }
     }
-
     function renderShootList(containerId, snapshot) {
       const ctr = document.getElementById(containerId);
       if (snapshot.empty) {
@@ -187,27 +253,116 @@
           <div class="d-flex justify-content-between align-items-center mb-2 p-3 border rounded bg-white">
             <div><strong>${d.userName}</strong> — ${d.date} — ${rangeTo12h(d.time)} — ${d.studio}</div>
             <div>
-              <button class="btn btn-sm btn-outline-danger"
-                      onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
             </div>
           </div>`;
       });
       ctr.innerHTML = html;
     }
-    // ======== نهاية من يصور ========
 
-    // ======== إدارة الأساتذة ========
+    // ======== حجز ثابت شهري ========
+    async function loadTeachersForRecurring() {
+      const sel = document.getElementById('recTeacher');
+      sel.innerHTML = `<option value="">جاري التحميل...</option>`;
+      const snap = await db.collection('users').where('role','==','teacher').get();
+      if (snap.empty) { sel.innerHTML = `<option value="">لا يوجد أساتذة</option>`; return; }
+      let html = `<option value="">اختر الأستاذ</option>`;
+      snap.forEach(d=>{
+        html += `<option value="${d.id}">${d.data().name}</option>`;
+      });
+      sel.innerHTML = html;
+    }
+
+    function getSelectedWeekdays() {
+      return Array.from(document.querySelectorAll('#w-sat,#w-sun,#w-mon,#w-tue,#w-wed,#w-thu,#w-fri'))
+        .filter(c => c.checked).map(c => parseInt(c.value,10));
+    }
+
+    // رجّع كل التواريخ داخل شهر معيّن توافق أيام الأسبوع المختارة
+    function datesForMonth(year, monthNum, weekdays) {
+      // monthNum: 1..12  | هنا نستعمل 1-based
+      const res = [];
+      const first = new Date(year, monthNum - 1, 1);
+      const last  = new Date(year, monthNum, 0); // اليوم الأخير
+      for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
+        if (weekdays.includes(d.getDay())) {
+          res.push(new Date(d));
+        }
+      }
+      return res;
+    }
+
+    async function createMonthlyRecurring() {
+      const month = parseInt(document.getElementById('recMonth').value, 10);   // 8..12
+      const teacherId = document.getElementById('recTeacher').value;
+      const studio = document.getElementById('recStudio').value;
+      const timeRange = document.getElementById('recTime').value;
+      const weekdays = getSelectedWeekdays();
+      const resultBox = document.getElementById('recResult');
+      resultBox.className = 'mt-3';
+      resultBox.innerHTML = '';
+
+      if (!teacherId || !timeRange || !studio || weekdays.length === 0) {
+        resultBox.classList.add('text-danger');
+        resultBox.textContent = 'يرجى اختيار الأستاذ، الأيام، الوقت، والاستوديو.';
+        return;
+      }
+
+      // نجيب اسم الأستاذ
+      const teacherDoc = await db.collection('users').doc(teacherId).get();
+      const teacherName = teacherDoc.exists ? (teacherDoc.data().name || 'أستاذ') : 'أستاذ';
+
+      const year = (new Date()).getFullYear();
+      const allDates = datesForMonth(year, month, weekdays)
+        .filter(d => d >= new Date(new Date().toDateString())); // اليوم وما بعده فقط
+
+      if (allDates.length === 0) {
+        resultBox.classList.add('text-warning');
+        resultBox.textContent = 'لا توجد أيام مطابقة في هذا الشهر.';
+        return;
+      }
+
+      let created = 0, skipped = 0;
+      for (const d of allDates) {
+        const dateStr = d.toISOString().split('T')[0];
+
+        // منع التكرار: تحقق من وجود نفس (date/time/studio)
+        const exist = await db.collection('bookings')
+          .where('date','==',dateStr)
+          .where('time','==',timeRange)
+          .where('studio','==',studio)
+          .get();
+
+        if (!exist.empty) { skipped++; continue; }
+
+        await db.collection('bookings').add({
+          userId: teacherId,
+          userName: teacherName,
+          date: dateStr,
+          time: timeRange,             // نخزن 24 ساعة ونعرض 12 ساعة
+          studio,
+          status: 'active',            // تأكيد مباشر
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        created++;
+      }
+
+      resultBox.classList.add(created ? 'text-success' : 'text-warning');
+      resultBox.textContent = `تم إنشاء ${created} حجز/حجوزات. تم تخطي ${skipped} بسبب التكرار.`;
+
+      // حدث القوائم
+      loadShootRequests();
+      loadBookingRequests();
+    }
+    // ======== نهاية حجز ثابت شهري ========
+
+    // ======== إدارة الأساتذة (كما كانت) ========
     async function loadTeachers() {
       const tb = document.getElementById('teachersTable');
       tb.innerHTML = '';
       try {
-        const snap = await db.collection('users')
-          .where('role','==','teacher')
-          .get();
-        if (snap.empty) {
-          tb.innerHTML = '<tr><td colspan="3">لا يوجد أساتذة.</td></tr>';
-          return;
-        }
+        const snap = await db.collection('users').where('role','==','teacher').get();
+        if (snap.empty) { tb.innerHTML = '<tr><td colspan="3">لا يوجد أساتذة.</td></tr>'; return; }
         snap.docs.forEach(doc => {
           const { name, role } = doc.data();
           tb.innerHTML += `
@@ -215,10 +370,8 @@
               <td>${name}</td>
               <td>${role}</td>
               <td>
-                <button class="btn btn-sm btn-primary me-1"
-                        onclick="showEditForm('${doc.id}','${name}','${role}')">✏️</button>
-                <button class="btn btn-sm btn-danger"
-                        onclick="deleteTeacher('${doc.id}')">🗑️</button>
+                <button class="btn btn-sm btn-primary me-1" onclick="showEditForm('${doc.id}','${name}','${role}')">✏️</button>
+                <button class="btn btn-sm btn-danger"  onclick="deleteTeacher('${doc.id}')">🗑️</button>
               </td>
             </tr>`;
         });
@@ -227,7 +380,6 @@
         tb.innerHTML = '<tr><td colspan="3">فشل التحميل</td></tr>';
       }
     }
-
     function showAddForm() {
       editId = null;
       document.getElementById('formContainer').innerHTML = formHtml();
@@ -238,52 +390,48 @@
       document.getElementById('formContainer').innerHTML = formHtml(name,role);
       window.scrollTo({top:0,behavior:'smooth'});
     }
-
     function formHtml(name='',role='teacher') {
       return `
         <div class="card mb-4 shadow-sm"><div class="card-body">
           <h5 class="card-title">${editId?'تعديل':'إضافة'} أستاذ</h5>
           <div class="row g-3 align-items-end">
-            <div class="col-md-6"><label>الاسم</label>
+            <div class="col-md-6"><label class="form-label">الاسم</label>
               <input id="inpName" class="form-control" value="${name}"></div>
-            <div class="col-md-4"><label>الدور</label>
+            <div class="col-md-4"><label class="form-label">الدور</label>
               <select id="inpRole" class="form-select">
                 <option value="teacher" ${role==='teacher'?'selected':''}>أستاذ</option>
                 <option value="admin"   ${role==='admin'?'selected':''}>مدير</option>
               </select></div>
             <div class="col-md-2 text-end">
-              <button class="btn btn-${editId?'primary':'success'} w-100"
-                      onclick="${editId?'updateTeacher()':'addTeacher()'}()">
+              <button class="btn btn-${editId?'primary':'success'} w-100" onclick="${editId?'updateTeacher()':'addTeacher()'}()">
                 ${editId?'تحديث':'إضافة'}
               </button>
             </div>
           </div>
         </div></div>`;
     }
-
     async function addTeacher() {
       const name = document.getElementById('inpName').value.trim();
       if (!name) return alert('يرجى تعبئة الاسم');
-      const uc = await auth.createUserWithEmailAndPassword(
-        `${Date.now()}@example.com`, '123456'
-      );
+      const uc = await auth.createUserWithEmailAndPassword(`${Date.now()}@example.com`, '123456');
       await db.collection('users').doc(uc.user.uid).set({ name, role:'teacher' });
       document.getElementById('formContainer').innerHTML = '';
       loadTeachers();
+      loadTeachersForRecurring();
     }
-
     async function updateTeacher() {
       const name = document.getElementById('inpName').value.trim();
       if (!name) return alert('يرجى تعبئة الاسم');
       await db.collection('users').doc(editId).update({ name });
       document.getElementById('formContainer').innerHTML = '';
       loadTeachers();
+      loadTeachersForRecurring();
     }
-
     async function deleteTeacher(id) {
       if (!confirm('تأكيد حذف الأستاذ؟')) return;
       await db.collection('users').doc(id).delete();
       loadTeachers();
+      loadTeachersForRecurring();
     }
     // ======== نهاية إدارة الأساتذة ========
   </script>
