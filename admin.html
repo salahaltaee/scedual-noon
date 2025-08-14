@@ -109,6 +109,42 @@
     printWindow.print();
   }
 </script>
+<!-- زر طباعة حجوزات الغد -->
+<div class="mb-3 text-end">
+  <button class="btn btn-outline-success" onclick="printTomorrowBookings()">🖨 طباعة حجوزات الغد</button>
+</div>
+
+<!-- من يصور غدٍ -->
+<div class="card mb-4">
+  <div class="card-header bg-info text-white">📅 من يصور غدٍ</div>
+  <div class="card-body" id="shootTomorrow">
+    <p class="text-muted">جارٍ التحميل...</p>
+  </div>
+</div>
+
+<script>
+  function printTomorrowBookings() {
+    const tomorrowSection = document.getElementById('shootTomorrow').innerHTML;
+    const printWindow = window.open('', '', 'width=800,height=600');
+    printWindow.document.write(`
+      <html lang="ar" dir="rtl">
+        <head>
+          <title>طباعة حجوزات الغد</title>
+          <style>
+            body { font-family: Arial, sans-serif; direction: rtl; text-align: right; }
+            .booking { padding: 10px; border-bottom: 1px solid #ccc; }
+          </style>
+        </head>
+        <body>
+          <h2>📅 حجوزات الغد</h2>
+          ${tomorrowSection}
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  }
+</script>
 
     <!-- من يصور اليوم -->
     <div class="card mb-4">
