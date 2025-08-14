@@ -28,6 +28,19 @@
       loadShootRequests();
       loadTeachers();
     };
+
+    // ====== أدوات مساعدة لتنسيق الوقت 12 ساعة ======
+    function to12h(one) {
+      let [h, m] = one.split(':').map(Number);
+      const suffix = h >= 12 ? 'م' : 'ص';
+      h = h % 12; if (h === 0) h = 12;
+      return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')} ${suffix}`;
+    }
+    function rangeTo12h(range) {
+      if (!range || !range.includes('-')) return range;
+      const [s, e] = range.split('-');
+      return `${to12h(s)} - ${to12h(e)}`;
+    }
   </script>
 </head>
 <body class="bg-light py-4">
@@ -107,12 +120,12 @@
           const d = doc.data();
           html += `
             <div class="d-flex justify-content-between align-items-center p-3 mb-2 border rounded bg-white">
-              <div><strong>${d.userName}</strong> — ${d.date} — ${d.time} — ${d.studio}</div>
-              <div>
-                <button class="btn btn-sm btn-success me-2"
-                        onclick="respondBooking('${doc.id}','active')">✔ موافقة</button>
-                <button class="btn btn-sm btn-danger"
-                        onclick="respondBooking('${doc.id}','rejected')">✖ رفض</button>
+              <div><strong>${d.userName}</strong> — ${d.date} — ${rangeTo12h(d.time)} — ${d.studio}</div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-success"
+                        onclick="approveBooking('${doc.id}')">✔ موافقة</button>
+                <button class="btn btn-sm btn-outline-danger"
+                        onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
               </div>
             </div>`;
         });
@@ -123,9 +136,17 @@
       }
     }
 
-    async function respondBooking(id, newStatus) {
-      if (newStatus === 'rejected' && !confirm('تأكيد رفض الطلب؟')) return;
-      await db.collection('bookings').doc(id).update({ status: newStatus });
+    // موافقة = تحويل الحالة إلى active
+    async function approveBooking(id) {
+      await db.collection('bookings').doc(id).update({ status: 'active' });
+      loadBookingRequests();
+      loadShootRequests();
+    }
+
+    // رفض (حذف) = إزالة المستند نهائياً
+    async function deleteBooking(id) {
+      if (!confirm('تأكيد حذف الموعد؟ سيتم تحرير هذا الوقت للحجز من جديد.')) return;
+      await db.collection('bookings').doc(id).delete();
       loadBookingRequests();
       loadShootRequests();
     }
@@ -134,19 +155,19 @@
     // ======== من يصور اليوم / غدٍ / بعد غدٍ ========
     async function loadShootRequests() {
       const today       = new Date();
-      const tomorrow    = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-      const dayAfter    = new Date(today); dayAfter.setDate(dayAfter.getDate() + 2);
+      const tomorrow    = new Date(today);    tomorrow.setDate(tomorrow.getDate() + 1);
+      const dayAfter    = new Date(today);    dayAfter.setDate(dayAfter.getDate() + 2);
 
       const dates = [
-        { id: 'shootToday', date: today },
-        { id: 'shootTomorrow', date: tomorrow },
+        { id: 'shootToday',            date: today },
+        { id: 'shootTomorrow',         date: tomorrow },
         { id: 'shootDayAfterTomorrow', date: dayAfter }
       ];
 
       for (const { id, date } of dates) {
         const dateStr = date.toISOString().split('T')[0];
         const snap = await db.collection('bookings')
-          .where('status','in',['active','approved'])
+          .where('status','==','active')
           .where('date','==',dateStr)
           .get();
         renderShootList(id, snap);
@@ -164,7 +185,11 @@
         const d = doc.data();
         html += `
           <div class="d-flex justify-content-between align-items-center mb-2 p-3 border rounded bg-white">
-            <div><strong>${d.userName}</strong> — ${d.date} — ${d.time} — ${d.studio}</div>
+            <div><strong>${d.userName}</strong> — ${d.date} — ${rangeTo12h(d.time)} — ${d.studio}</div>
+            <div>
+              <button class="btn btn-sm btn-outline-danger"
+                      onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
+            </div>
           </div>`;
       });
       ctr.innerHTML = html;
