@@ -12,7 +12,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body class="bg-light">
-  <div class="container py-5">
+  <div class="container py-5" style="max-width:700px">
 
     <h3 class="text-center mb-4">📅 حجز موعد تصوير</h3>
 
@@ -30,18 +30,12 @@
       <input type="date" id="bookingDate" class="form-control" readonly>
     </div>
 
-    <!-- الفترات الزمنية -->
+    <!-- الفترات الزمنية (تُعرض 12 ساعة) -->
     <div class="mb-3">
       <label for="bookingTime" class="form-label">🕒 الفترة الزمنية</label>
       <select id="bookingTime" class="form-select">
         <option value="">اختر الفترة</option>
-        <option value="10:00-12:00">10:00 - 12:00</option>
-        <option value="12:00-14:00">12:00 - 14:00</option>
-        <option value="14:00-16:00">14:00 - 16:00</option>
-        <option value="16:00-18:00">16:00 - 18:00</option>
-        <option value="18:00-20:00">18:00 - 20:00</option>
-        <option value="20:00-22:00">20:00 - 22:00</option>
-        <option value="22:00-00:00">22:00 - 00:00</option>
+        <!-- سيتم توليد الخيارات بالـ JS بنظام 12 ساعة -->
       </select>
     </div>
 
@@ -58,10 +52,16 @@
     <!-- الأزرار -->
     <div class="d-flex gap-2 mb-3">
       <button class="btn btn-success flex-fill" onclick="submitBooking()">✅ تثبيت الطلب</button>
-      <button class="btn btn-primary flex-fill" onclick="sendWhatsapp()">📩 إرسال رسالة</button>
+      <button class="btn btn-primary flex-fill" onclick="sendWhatsapp()">📩 إرسال رسالة (بالتفاصيل)</button>
     </div>
 
-    <div id="msg" class="text-center text-danger"></div>
+    <div id="msg" class="text-center text-danger mb-4"></div>
+
+    <!-- زر واتساب بسيط أسفل الصفحة -->
+    <div class="text-center">
+      <button class="btn btn-outline-dark" onclick="sendSimpleWhatsapp()">📨 ارسال رسالة: اريد حجز</button>
+    </div>
+
   </div>
 
   <!-- سكريبت Firebase والمنطق -->
@@ -76,8 +76,34 @@
     const db = firebase.firestore();
 
     let teachers = [];
+
+    // ====== تنسيقات الوقت 12 ساعة ======
+    function to12(hhmm) {
+      if (!hhmm) return '';
+      let [h, m] = hhmm.split(':').map(Number);
+      const ampm = h >= 12 ? 'م' : 'ص';
+      let h12 = h % 12; if (h12 === 0) h12 = 12;
+      return `${h12.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')} ${ampm}`;
+    }
+    function rangeTo12(range) {
+      if (!range || !range.includes('-')) return range || '';
+      const [s, e] = range.split('-');
+      return `${to12(s)} - ${to12(e)}`;
+    }
   </script>
+
   <script>
+    // الفترات (قيم 24 ساعة، تُعرض 12 ساعة)
+    const TIME_RANGES = [
+      "10:00-12:00",
+      "12:00-14:00",
+      "14:00-16:00",
+      "16:00-18:00",
+      "18:00-20:00",
+      "20:00-22:00",
+      "22:00-00:00"
+    ];
+
     // تحميل قائمة الأساتذة من Firestore
     async function loadTeachers() {
       const sel = document.getElementById("teacherSelect");
@@ -93,24 +119,44 @@
       });
     }
 
-    // ضبط تاريخ الغد تلقائيًا
+    // توليد خيارات الوقت بعرض 12 ساعة
+    function setupTimes() {
+      const sel = document.getElementById("bookingTime");
+      // امسح الموجود ما عدا أول خيار
+      sel.querySelectorAll('option:not(:first-child)').forEach(o => o.remove());
+      TIME_RANGES.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;                 // نخزن 24 ساعة
+        opt.textContent = rangeTo12(r) // نعرض 12 ساعة
+        sel.append(opt);
+      });
+    }
+
+    // ضبط تاريخ الغد تلقائيًا (محلي)
     function setupDate() {
       const inp = document.getElementById("bookingDate");
       const d = new Date();
       d.setDate(d.getDate() + 1);
-      inp.value = d.toISOString().split("T")[0];
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      inp.value = `${yyyy}-${mm}-${dd}`;
     }
 
     // حفظ الحجز مع فحص التكرار
     async function submitBooking() {
-      document.getElementById("msg").textContent = "";
+      const msg = document.getElementById("msg");
+      msg.className = "text-center text-danger";
+      msg.textContent = "";
+
       const teacherId = document.getElementById("teacherSelect").value;
       const teacherName = teachers.find(t=>t.id===teacherId)?.name;
       const date = document.getElementById("bookingDate").value;
-      const time = document.getElementById("bookingTime").value;
+      const time = document.getElementById("bookingTime").value; // 24h value
       const studio = document.getElementById("bookingStudio").value;
       if (!teacherId||!date||!time||!studio) {
-        return document.getElementById("msg").textContent = "يرجى ملء جميع الحقول";
+        msg.textContent = "يرجى ملء جميع الحقول";
+        return;
       }
       // فحص التكرار
       const exist = await db.collection("bookings")
@@ -119,33 +165,44 @@
         .where("studio","==",studio)
         .get();
       if (!exist.empty) {
-        return document.getElementById("msg").textContent = "⚠️ تم حجز هذا الموعد مسبقًا";
+        msg.textContent = "⚠️ تم حجز هذا الموعد مسبقًا";
+        return;
       }
       await db.collection("bookings").add({
         teacherId,
         userName: teacherName,
         date,
-        time,
+        time,                    // نخزنها 24 ساعة
         studio,
         status: "pending",
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      document.getElementById("msg").className = "text-center text-success";
-      document.getElementById("msg").textContent = "✅ تم إرسال طلبك بانتظار الموافقة";
+      msg.className = "text-center text-success";
+      msg.textContent = "✅ تم إرسال طلبك بانتظار الموافقة";
     }
 
-    // إرسال رسالة واتساب جاهزة
+    // إرسال رسالة واتساب مع التفاصيل (الوقت معروض 12 ساعة)
     function sendWhatsapp() {
+      const msg = document.getElementById("msg");
+      msg.textContent = "";
       const teacherId = document.getElementById("teacherSelect").value;
       const teacherName = teachers.find(t=>t.id===teacherId)?.name || "أستاذ";
       const date = document.getElementById("bookingDate").value;
-      const time = document.getElementById("bookingTime").value;
-      if (!teacherId||!date||!time) {
-        return document.getElementById("msg").textContent = "يرجى اختيار الأستاذ والتاريخ والوقت أولًا";
+      const time24 = document.getElementById("bookingTime").value;
+      if (!teacherId||!date||!time24) {
+        msg.textContent = "يرجى اختيار الأستاذ والتاريخ والوقت أولًا";
+        return;
       }
+      const time12 = rangeTo12(time24);
       const text = encodeURIComponent(
-        `مرحبا استوديو نون، أنا الأستاذ ${teacherName}، أريد حجزيوم غد الساعة ${time}`
+        `مرحبا استوديو نون، أنا الأستاذ ${teacherName}، أريد حجز يوم غد ${date} الساعة ${time12}`
       );
+      window.open(`https://wa.me/9647855002173?text=${text}`, "_blank");
+    }
+
+    // زر سفلي بسيط: "اريد حجز"
+    function sendSimpleWhatsapp() {
+      const text = encodeURIComponent('اريد حجز');
       window.open(`https://wa.me/9647855002173?text=${text}`, "_blank");
     }
 
@@ -153,6 +210,7 @@
     window.onload = () => {
       loadTeachers();
       setupDate();
+      setupTimes();
     };
   </script>
 </body>
