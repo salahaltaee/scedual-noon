@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>لوحة التحكم - Scudual</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
@@ -23,7 +23,7 @@
     const auth = firebase.auth();
     let editId = null;
 
-    // ===== أدوات مساعدة لتواريخ محلية (بدون UTC) =====
+    // ===== أدوات مساعدة للتواريخ المحلية (بدون UTC) =====
     function formatLocalDate(d) {
       const y = d.getFullYear();
       const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -31,12 +31,11 @@
       return `${y}-${m}-${day}`;
     }
     function lastDayStr(year, month1to12) {
-      // month1to12: 1..12
-      const last = new Date(year, month1to12, 0); // آخر يوم في الشهر
+      const last = new Date(year, month1to12, 0);
       return formatLocalDate(last);
     }
 
-    // ===== أدوات مساعدة لتنسيق الوقت 12 ساعة =====
+    // ===== تنسيق الوقت 12 ساعة + فرز حسب بداية الفترة =====
     function to12h(one) {
       if (!one) return '';
       let [h, m] = one.split(':').map(Number);
@@ -49,15 +48,23 @@
       const [s, e] = range.split('-');
       return `${to12h(s)} - ${to12h(e)}`;
     }
+    // يرجع دقائق بداية الفترة "HH:MM-HH:MM" مع اعتبار 00:00 = 24:00 حتى تأتي أخيرًا
+    function startMinutes(range) {
+      if (!range || !range.includes('-')) return 99999;
+      const start = range.split('-')[0];
+      const [h, m] = start.split(':').map(Number);
+      const hh = (h === 0 && m === 0) ? 24 : h;
+      return hh * 60 + m;
+    }
 
     window.onload = () => {
       loadBookingRequests();
       loadShootRequests();
       loadTeachers();
       loadTeachersForRecurring();
-      loadTeachersForManual();  // تعبئة قائمة الأساتذة في الحجز اليدوي
-      initMonthPicker();       // للسكشن الجديد أسفل الصفحة
-      loadMonthlyBookings();   // تحميل الشهر الحالي افتراضياً
+      loadTeachersForManual();
+      initMonthPicker();
+      loadMonthlyBookings();
     };
   </script>
 </head>
@@ -73,100 +80,37 @@
         <p class="text-muted">جارٍ التحميل...</p>
       </div>
     </div>
-<!-- زر الطباعة -->
-<div class="mb-3 text-end">
-  <button class="btn btn-outline-primary" onclick="printTodayBookings()">🖨 طباعة حجوزات اليوم</button>
-</div>
-
-<!-- من يصور اليوم -->
-<div class="card mb-4">
-  <div class="card-header bg-primary text-white">📅 من يصور اليوم</div>
-  <div class="card-body" id="shootToday">
-    <p class="text-muted">جارٍ التحميل...</p>
-  </div>
-</div>
-
-<script>
-  function printTodayBookings() {
-    const todaySection = document.getElementById('shootToday').innerHTML;
-    const printWindow = window.open('', '', 'width=800,height=600');
-    printWindow.document.write(`
-      <html lang="ar" dir="rtl">
-        <head>
-          <title>طباعة حجوزات اليوم</title>
-          <style>
-            body { font-family: Arial, sans-serif; direction: rtl; text-align: right; }
-            .booking { padding: 10px; border-bottom: 1px solid #ccc; }
-          </style>
-        </head>
-        <body>
-          <h2>📅 حجوزات اليوم</h2>
-          ${todaySection}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-  }
-</script>
-<!-- زر طباعة حجوزات الغد -->
-<div class="mb-3 text-end">
-  <button class="btn btn-outline-success" onclick="printTomorrowBookings()">🖨 طباعة حجوزات الغد</button>
-</div>
-
-<!-- من يصور غدٍ -->
-<div class="card mb-4">
-  <div class="card-header bg-info text-white">📅 من يصور غدٍ</div>
-  <div class="card-body" id="shootTomorrow">
-    <p class="text-muted">جارٍ التحميل...</p>
-  </div>
-</div>
-
-<script>
-  function printTomorrowBookings() {
-    const tomorrowSection = document.getElementById('shootTomorrow').innerHTML;
-    const printWindow = window.open('', '', 'width=800,height=600');
-    printWindow.document.write(`
-      <html lang="ar" dir="rtl">
-        <head>
-          <title>طباعة حجوزات الغد</title>
-          <style>
-            body { font-family: Arial, sans-serif; direction: rtl; text-align: right; }
-            .booking { padding: 10px; border-bottom: 1px solid #ccc; }
-          </style>
-        </head>
-        <body>
-          <h2>📅 حجوزات الغد</h2>
-          ${tomorrowSection}
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-  }
-</script>
 
     <!-- من يصور اليوم -->
     <div class="card mb-4">
-      <div class="card-header bg-primary text-white">📅 من يصور اليوم</div>
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span>📅 من يصور اليوم</span>
+        <button class="btn btn-light btn-sm" onclick="printSection('shootToday','حجوزات اليوم')">🖨 طباعة</button>
+      </div>
       <div class="card-body" id="shootToday">
-        <p class="text-muted">جارٍ التحميل...</p>
+        <p class="text-muted mb-0">جارٍ التحميل...</p>
       </div>
     </div>
 
     <!-- من يصور غدٍ -->
     <div class="card mb-4">
-      <div class="card-header bg-info text-white">📅 من يصور غدٍ</div>
+      <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+        <span>📅 من يصور غدٍ</span>
+        <button class="btn btn-light btn-sm" onclick="printSection('shootTomorrow','حجوزات الغد')">🖨 طباعة</button>
+      </div>
       <div class="card-body" id="shootTomorrow">
-        <p class="text-muted">جارٍ التحميل...</p>
+        <p class="text-muted mb-0">جارٍ التحميل...</p>
       </div>
     </div>
 
     <!-- من يصور بعد غدٍ -->
     <div class="card mb-4">
-      <div class="card-header bg-secondary text-white">📅 من يصور بعد غدٍ</div>
+      <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+        <span>📅 من يصور بعد غدٍ</span>
+        <button class="btn btn-light btn-sm" onclick="printSection('shootDayAfterTomorrow','حجوزات بعد غد')">🖨 طباعة</button>
+      </div>
       <div class="card-body" id="shootDayAfterTomorrow">
-        <p class="text-muted">جارٍ التحميل...</p>
+        <p class="text-muted mb-0">جارٍ التحميل...</p>
       </div>
     </div>
 
@@ -175,7 +119,6 @@
       <div class="card-header bg-success text-white">📆 حجز ثابت شهري</div>
       <div class="card-body">
         <div class="row g-3">
-          <!-- الشهر -->
           <div class="col-md-3">
             <label class="form-label">الشهر</label>
             <select id="recMonth" class="form-select">
@@ -186,14 +129,12 @@
               <option value="12">شهر 12 (كانون الأول)</option>
             </select>
           </div>
-          <!-- الأستاذ -->
           <div class="col-md-4">
             <label class="form-label">الأستاذ</label>
             <select id="recTeacher" class="form-select">
               <option value="">جاري التحميل...</option>
             </select>
           </div>
-          <!-- الاستوديو -->
           <div class="col-md-3">
             <label class="form-label">الاستوديو</label>
             <select id="recStudio" class="form-select">
@@ -203,22 +144,20 @@
           </div>
         </div>
 
-        <!-- أيام الأسبوع -->
         <div class="mt-3">
           <label class="form-label d-block">أيام الأسبوع (يمكن اختيار أكثر من يوم)</label>
           <div class="d-flex flex-wrap gap-2">
             <!-- JS: الأحد=0 ... السبت=6 -->
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-sat" value="6"><label class="form-check-label" for="w-sat">السبت</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-sun" value="0"><label class="form-check-label" for="w-sun">الأحد</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-mon" value="1"><label class="form-check-label" for="w-mon">الإثنين</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-tue" value="2"><label class="form-check-label" for="w-tue">الثلاثاء</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-wed" value="3"><label class="form-check-label" for="w-wed">الأربعاء</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-thu" value="4"><label class="form-check-label" for="w-thu">الخميس</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" id="w-fri" value="5"><label class="form-check-label" for="w-fri">الجمعة</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" value="6" id="w-sat"><label class="form-check-label" for="w-sat">السبت</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" value="0" id="w-sun"><label class="form-check-label" for="w-sun">الأحد</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" value="1" id="w-mon"><label class="form-check-label" for="w-mon">الإثنين</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" value="2" id="w-tue"><label class="form-check-label" for="w-tue">الثلاثاء</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" value="3" id="w-wed"><label class="form-check-label" for="w-wed">الأربعاء</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" value="4" id="w-thu"><label class="form-check-label" for="w-thu">الخميس</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" value="5" id="w-fri"><label class="form-check-label" for="w-fri">الجمعة</label></div>
           </div>
         </div>
 
-        <!-- الوقت -->
         <div class="row g-3 mt-2">
           <div class="col-md-4">
             <label class="form-label">الفترة الزمنية</label>
@@ -241,7 +180,6 @@
         <div id="recResult" class="mt-3"></div>
       </div>
     </div>
-    <!-- نهاية حجز ثابت شهري -->
 
     <!-- إدارة الأساتذة -->
     <div class="mb-4 text-end">
@@ -283,13 +221,12 @@
           </div>
         </div>
         <div id="monthlyBookings" class="mt-3">
-          <p class="text-muted">جارٍ التحميل...</p>
+          <p class="text-muted mb-0">جارٍ التحميل...</p>
         </div>
       </div>
     </div>
-    <!-- نهاية حجوزات الشهر -->
 
-    <!-- ====== إضافة حجز يدوي (أي تاريخ) ====== -->
+    <!-- إضافة حجز يدوي (أي تاريخ) -->
     <div class="card mb-4">
       <div class="card-header bg-warning-subtle">➕ إضافة حجز يدوي</div>
       <div class="card-body">
@@ -331,11 +268,36 @@
         <div id="manualResult" class="mt-3"></div>
       </div>
     </div>
-    <!-- ====== نهاية إضافة حجز يدوي ====== -->
 
   </div>
 
   <script>
+    // ======== طباعة أي قسم ========
+    function printSection(containerId, titleText) {
+      const content = document.getElementById(containerId)?.innerHTML || '';
+      const w = window.open('', '', 'width=900,height=700');
+      w.document.write(`
+        <html lang="ar" dir="rtl">
+          <head>
+            <meta charset="UTF-8">
+            <title>${titleText}</title>
+            <style>
+              body { font-family: Arial, sans-serif; direction: rtl; text-align: right; padding: 16px; }
+              .item { padding:10px; border-bottom:1px solid #ddd; }
+              h2 { margin-top:0; }
+              .badge { margin-right:8px; }
+            </style>
+          </head>
+          <body>
+            <h2>📄 ${titleText}</h2>
+            ${content}
+          </body>
+        </html>
+      `);
+      w.document.close();
+      w.print();
+    }
+
     // ======== طلبات التصوير الجديدة ========
     async function loadBookingRequests() {
       const ctr = document.getElementById('bookingRequests');
@@ -345,25 +307,27 @@
           .where('status','==','pending')
           .get();
         if (snap.empty) {
-          ctr.innerHTML = `<div class="alert alert-secondary">لا توجد طلبات جديدة</div>`;
+          ctr.innerHTML = `<div class="alert alert-secondary mb-0">لا توجد طلبات جديدة</div>`;
           return;
         }
+        const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // نرتب حسب التاريخ ثم الوقت
+        items.sort((a,b) => (a.date||'').localeCompare(b.date||'') || (startMinutes(a.time) - startMinutes(b.time)));
         let html = '';
-        snap.docs.forEach(doc => {
-          const d = doc.data();
+        items.forEach(d => {
           html += `
             <div class="d-flex justify-content-between align-items-center p-3 mb-2 border rounded bg-white">
               <div><strong>${d.userName}</strong> — ${d.date} — ${rangeTo12h(d.time)} — ${d.studio}</div>
               <div class="d-flex gap-2">
-                <button class="btn btn-sm btn-success" onclick="approveBooking('${doc.id}')">✔ موافقة</button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
+                <button class="btn btn-sm btn-success" onclick="approveBooking('${d.id}')">✔ موافقة</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking('${d.id}')">🗑️ حذف</button>
               </div>
             </div>`;
         });
         ctr.innerHTML = html;
       } catch(e) {
         console.error('خطأ أثناء تحميل الطلبات:', e);
-        ctr.innerHTML = `<div class="alert alert-danger">فشل التحميل.</div>`;
+        ctr.innerHTML = `<div class="alert alert-danger mb-0">فشل التحميل.</div>`;
       }
     }
     async function approveBooking(id) {
@@ -380,7 +344,7 @@
       loadMonthlyBookings();
     }
 
-    // ======== من يصور اليوم / غدٍ / بعد غدٍ ========
+    // ======== من يصور اليوم / غدٍ / بعد غدٍ (مرتّبة بالوقت) ========
     async function loadShootRequests() {
       const today       = new Date();
       const tomorrow    = new Date(today);    tomorrow.setDate(tomorrow.getDate() + 1);
@@ -398,23 +362,26 @@
           .where('status','==','active')
           .where('date','==',dateStr)
           .get();
-        renderShootList(id, snap);
+
+        const items = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        items.sort((a,b) => startMinutes(a.time) - startMinutes(b.time));
+        renderShootList(id, items);
       }
     }
-    function renderShootList(containerId, snapshot) {
+
+    function renderShootList(containerId, items) {
       const ctr = document.getElementById(containerId);
-      if (snapshot.empty) {
-        ctr.innerHTML = `<div class="alert alert-secondary">لا توجد حجوزات</div>`;
+      if (!items || items.length === 0) {
+        ctr.innerHTML = `<div class="alert alert-secondary mb-0">لا توجد حجوزات</div>`;
         return;
       }
       let html = '';
-      snapshot.docs.forEach(doc => {
-        const d = doc.data();
+      items.forEach(d => {
         html += `
           <div class="d-flex justify-content-between align-items-center mb-2 p-3 border rounded bg-white">
-            <div><strong>${d.userName}</strong> — ${d.date} — ${rangeTo12h(d.time)} — ${d.studio}</div>
+            <div><strong>${d.userName || 'أستاذ'}</strong> — ${d.date} — ${rangeTo12h(d.time)} — ${d.studio}</div>
             <div>
-              <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking('${doc.id}')">🗑️ حذف</button>
+              <button class="btn btn-sm btn-outline-danger" onclick="deleteBooking('${d.id}')">🗑️ حذف</button>
             </div>
           </div>`;
       });
@@ -428,9 +395,7 @@
       const snap = await db.collection('users').where('role','==','teacher').get();
       if (snap.empty) { sel.innerHTML = `<option value="">لا يوجد أساتذة</option>`; return; }
       let html = `<option value="">اختر الأستاذ</option>`;
-      snap.forEach(d=>{
-        html += `<option value="${d.id}">${d.data().name}</option>`;
-      });
+      snap.forEach(d => { html += `<option value="${d.id}">${d.data().name}</option>`; });
       sel.innerHTML = html;
     }
     function getSelectedWeekdays() {
@@ -438,20 +403,18 @@
         .filter(c => c.checked).map(c => parseInt(c.value,10));
     }
     function datesForMonth(year, monthNum, weekdays) {
-      // monthNum: 1..12
       const res = [];
       const first = new Date(year, monthNum - 1, 1);
       const last  = new Date(year, monthNum, 0);
       for (let d = new Date(first); d <= last; d.setDate(d.getDate() + 1)) {
         if (weekdays.includes(d.getDay())) {
-          // ننسخ لتفادي ميوتيشن
           res.push(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
         }
       }
       return res;
     }
     async function createMonthlyRecurring() {
-      const month = parseInt(document.getElementById('recMonth').value, 10);   // 8..12
+      const month = parseInt(document.getElementById('recMonth').value, 10);
       const teacherId = document.getElementById('recTeacher').value;
       const studio = document.getElementById('recStudio').value;
       const timeRange = document.getElementById('recTime').value;
@@ -466,7 +429,6 @@
         return;
       }
 
-      // اسم الأستاذ
       const teacherDoc = await db.collection('users').doc(teacherId).get();
       const teacherName = teacherDoc.exists ? (teacherDoc.data().name || 'أستاذ') : 'أستاذ';
 
@@ -474,8 +436,7 @@
       const year = now.getFullYear();
       const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-      const allDates = datesForMonth(year, month, weekdays)
-        .filter(d => d >= todayLocal); // اليوم وما بعده
+      const allDates = datesForMonth(year, month, weekdays).filter(d => d >= todayLocal);
 
       if (allDates.length === 0) {
         resultBox.classList.add('text-warning');
@@ -487,7 +448,6 @@
       for (const d of allDates) {
         const dateStr = formatLocalDate(d);
 
-        // منع التكرار: (date/time/studio)
         const exist = await db.collection('bookings')
           .where('date','==',dateStr)
           .where('time','==',timeRange)
@@ -500,9 +460,9 @@
           userId: teacherId,
           userName: teacherName,
           date: dateStr,
-          time: timeRange,             // نخزن 24 ساعة ونعرض 12 ساعة
+          time: timeRange,
           studio,
-          status: 'active',            // تأكيد مباشر
+          status: 'active',
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         created++;
@@ -511,57 +471,51 @@
       resultBox.classList.add(created ? 'text-success' : 'text-warning');
       resultBox.textContent = `تم إنشاء ${created} حجز/حجوزات. تم تخطي ${skipped} بسبب التكرار.`;
 
-      // تحديث القوائم
       loadShootRequests();
       loadBookingRequests();
       loadMonthlyBookings();
     }
 
-    // ======== حجوزات الشهر بالكامل (أسفل الصفحة) ========
+    // ======== حجوزات الشهر بالكامل ========
     function initMonthPicker() {
-      // ضبط الشهر الحالي افتراضياً في القائمة
       const mv = document.getElementById('monthView');
-      const monthNow = (new Date()).getMonth() + 1; // 1..12
-      if ([8,9,10,11,12].includes(monthNow)) {
-        mv.value = String(monthNow);
-      } else {
-        mv.value = '8'; // الافتراضي ضمن قائمتك
-      }
+      const monthNow = (new Date()).getMonth() + 1;
+      if ([8,9,10,11,12].includes(monthNow)) mv.value = String(monthNow);
+      else mv.value = '8';
     }
     async function loadMonthlyBookings() {
       const box = document.getElementById('monthlyBookings');
-      box.innerHTML = `<p class="text-muted">جارٍ التحميل...</p>`;
+      box.innerHTML = `<p class="text-muted mb-0">جارٍ التحميل...</p>`;
 
       const month = parseInt(document.getElementById('monthView').value, 10);
       const year = (new Date()).getFullYear();
       const startStr = `${year}-${String(month).padStart(2,'0')}-01`;
-      const endStr   = lastDayStr(year, month); // آخر يوم بنفس الشهر (محلي)
+      const endStr   = lastDayStr(year, month);
 
       try {
-        // نجلب كل الحجوزات ضمن حدود الشهر (بغض النظر عن الحالة)
         const snap = await db.collection('bookings')
           .where('date','>=', startStr)
           .where('date','<=', endStr)
           .get();
 
         if (snap.empty) {
-          box.innerHTML = `<div class="alert alert-secondary">لا توجد حجوزات لهذا الشهر.</div>`;
+          box.innerHTML = `<div class="alert alert-secondary mb-0">لا توجد حجوزات لهذا الشهر.</div>`;
           return;
         }
 
-        // فرز وتجميع حسب اليوم
         const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        arr.sort((a,b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || ''));
+        arr.sort((a,b) => (a.date || '').localeCompare(b.date || '') || (startMinutes(a.time) - startMinutes(b.time)));
 
         let currentDate = '';
         let html = '';
         arr.forEach(it => {
           const badge = it.status === 'active' ? '<span class="badge bg-success ms-2">مؤكد</span>'
-                       : it.status === 'pending' ? '<span class="badge bg-warning text-dark ms-2">بانتظار</span>'
-                       : it.status === 'rejected' ? '<span class="badge bg-danger ms-2">مرفوض</span>'
-                       : '<span class="badge bg-secondary ms-2">غير معلوم</span>';
+                     : it.status === 'pending' ? '<span class="badge bg-warning text-dark ms-2">بانتظار</span>'
+                     : it.status === 'rejected' ? '<span class="badge bg-danger ms-2">مرفوض</span>'
+                     : '<span class="badge bg-secondary ms-2">غير معلوم</span>';
+
           if (it.date !== currentDate) {
-            if (currentDate !== '') html += `</div>`; // اغلاق مجموعة اليوم السابق
+            if (currentDate !== '') html += `</div>`;
             currentDate = it.date;
             html += `<h6 class="mt-3">📅 ${currentDate}</h6><div class="list-group">`;
           }
@@ -580,7 +534,7 @@
         box.innerHTML = html;
       } catch (e) {
         console.error('خطأ تحميل حجوزات الشهر:', e);
-        box.innerHTML = `<div class="alert alert-danger">تعذر تحميل حجوزات الشهر.</div>`;
+        box.innerHTML = `<div class="alert alert-danger mb-0">تعذر تحميل حجوزات الشهر.</div>`;
       }
     }
 
@@ -682,7 +636,7 @@
     }
 
     async function createManualBooking() {
-      const dateStr   = document.getElementById('manualDate').value;   // yyyy-mm-dd من input date
+      const dateStr   = document.getElementById('manualDate').value;
       const teacherId = document.getElementById('manualTeacher').value;
       const studio    = document.getElementById('manualStudio').value;
       const timeRange = document.getElementById('manualTime').value;
@@ -698,11 +652,9 @@
       }
 
       try {
-        // اسم الأستاذ
         const tDoc = await db.collection('users').doc(teacherId).get();
         const teacherName = tDoc.exists ? (tDoc.data().name || 'أستاذ') : 'أستاذ';
 
-        // منع التكرار: (date/time/studio)
         const exist = await db.collection('bookings')
           .where('date','==',dateStr)
           .where('time','==',timeRange)
@@ -718,7 +670,7 @@
           userId: teacherId,
           userName: teacherName,
           date: dateStr,
-          time: timeRange,               // نخزن 24 ساعة ونعرض 12 ساعة
+          time: timeRange,
           studio,
           status: 'active',
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -727,13 +679,10 @@
         box.classList.add('text-success');
         box.textContent = '✅ تم تثبيت الحجز بنجاح.';
 
-        // تحديث القوائم
         loadShootRequests();
         loadMonthlyBookings();
         loadBookingRequests();
 
-        // إعادة تعيين الحقول
-        // document.getElementById('manualDate').value = '';
         document.getElementById('manualTeacher').value = '';
         document.getElementById('manualTime').value = '';
         document.getElementById('manualStudio').value = 'الرئيسي';
@@ -743,7 +692,6 @@
         box.textContent = 'حدث خطأ أثناء إنشاء الحجز.';
       }
     }
-    // ======== نهاية الحجز اليدوي ========
   </script>
 </body>
 </html>
