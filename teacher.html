@@ -18,7 +18,7 @@
   <div class="container" style="max-width:1100px">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h4 class="m-0" id="greeting">مرحبًا أستاذ …</h4>
-      <button class="btn btn-outline-danger btn-sm" id="btnSignOut" onclick="auth.signOut()">تسجيل خروج</button>
+      <button class="btn btn-outline-danger btn-sm" onclick="auth.signOut()">تسجيل خروج</button>
     </div>
 
     <!-- بطاقة الحجز -->
@@ -126,15 +126,14 @@
 
     // ===== State =====
     let currentUser = null;     // Firebase Auth user
-    let teacherDoc  = null;     // users/{doc} (قد يكون docId != authUid)
+    let teacherDoc  = null;     // users/{doc}
     let teacherName = 'أستاذ';
 
-    // ===== Auth & bootstrap UI =====
     auth.onAuthStateChanged(async (u) => {
       if(!u){ window.location.href = 'login.html'; return; }
       currentUser = u;
 
-      // جلب وثيقة الأستاذ: أولاً authUid، وإن لم توجد نستخدم docId == uid
+      // جلب وثيقة الأستاذ: أولاً authUid، ثم fallback إلى uid
       const q = await db.collection('users').where('authUid','==',u.uid).limit(1).get();
       if(!q.empty){
         teacherDoc = q.docs[0];
@@ -167,32 +166,36 @@
       ]);
     }
 
-    // جلب حجوزات يوم محدد لهذا الأستاذ (بغض النظر عن الحالة) وترتيبها حسب الوقت
+    // ✅ تم التعديل هنا: نستعلم بالـ date فقط ثم نفلتر محليًا للمدرّس
     async function loadForDate(dateStr, containerId){
       const box = document.getElementById(containerId);
       box.innerHTML = `<p class="text-muted m-0">جارٍ التحميل…</p>`;
       if(!currentUser) return;
 
       try{
-        let snap = await db.collection('bookings')
+        const snap = await db.collection('bookings')
           .where('date','==',dateStr)
-          .where('authUid','==',currentUser.uid)
           .get();
-
-        // دعم البيانات القديمة التي لا تحتوي authUid
-        if(snap.empty && teacherDoc){
-          snap = await db.collection('bookings')
-            .where('date','==',dateStr)
-            .where('userId','==',teacherDoc.id)
-            .get();
-        }
 
         if(snap.empty){
           box.innerHTML = `<div class="alert alert-light m-0">لا توجد محاضرات لهذا اليوم.</div>`;
           return;
         }
 
-        const items = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+        // فلترة: نفس المدرّس (authUid أو userId) أو بالاسم كاحتياط
+        const myUid    = currentUser.uid;
+        const myUserId = teacherDoc?.id || '__none__';
+        const itemsAll = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        const items = itemsAll.filter(it =>
+          it.authUid === myUid || it.userId === myUserId || (it.userName && it.userName === teacherName)
+        );
+
+        if(items.length === 0){
+          box.innerHTML = `<div class="alert alert-light m-0">لا توجد محاضرات لهذا اليوم.</div>`;
+          return;
+        }
+
+        // ترتيب حسب وقت البداية
         items.sort((a,b)=> startMinutes(a.time)-startMinutes(b.time));
 
         let html = '';
@@ -227,12 +230,10 @@
       const today = todayStr();
 
       try{
-        // 1) جرّب authUid (النموذج الجديد)
         let snap = await db.collection('bookings')
           .where('authUid','==',currentUser.uid)
           .get();
 
-        // 2) دعم قديم: userId == docId
         if(snap.empty && teacherDoc){
           snap = await db.collection('bookings')
             .where('userId','==',teacherDoc.id)
@@ -244,7 +245,6 @@
           return;
         }
 
-        // فلترة محلية للماضي فقط ثم ترتيب
         const all  = snap.docs.map(d => ({ id:d.id, ...d.data() }));
         const past = all.filter(it => (it.date || '') < today);
 
@@ -290,7 +290,6 @@
       }
 
       try{
-        // منع التكرار على مستوى الاستوديو
         const exist = await db.collection('bookings')
           .where('date','==',date)
           .where('time','==',time)
@@ -304,9 +303,7 @@
           authUid : currentUser.uid,      // للنسخة الجديدة
           userId  : teacherDoc.id,        // دعم قديم
           userName: teacherName,
-          date,
-          time,                           // 24h
-          studio,
+          date, time, studio,
           status: 'pending',
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
@@ -319,7 +316,6 @@
       }
     }
 
-    // إرسال واتساب
     function sendWhatsapp(){
       const date = document.getElementById('bookingDate').value;
       const time = document.getElementById('bookingTime').value;
