@@ -1,14 +1,88 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>صفحة الأستاذ</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>صفحة الأستاذ - الحجوزات</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
+  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <style>
+    body{background:#f6f7fb}
+    .card{box-shadow:0 2px 10px rgba(0,0,0,.05)}
+  </style>
+</head>
+<body class="py-4">
+  <div class="container" style="max-width:1100px">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="m-0" id="greeting">مرحبًا أستاذ …</h4>
+      <button class="btn btn-outline-danger btn-sm" id="btnSignOut" onclick="auth.signOut()">تسجيل خروج</button>
+    </div>
+
+    <!-- بطاقة الحجز -->
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>حجز موعد تصوير (لغد فقط)</span>
+        <span class="small text-muted">🗓️</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">تاريخ الموعد</label>
+            <input type="date" id="bookingDate" class="form-control" readonly />
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">الفترة الزمنية</label>
+            <select id="bookingTime" class="form-select">
+              <option value="">اختر الفترة</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">الاستوديو</label>
+            <select id="bookingStudio" class="form-select">
+              <option value="">اختر الاستوديو</option>
+              <option value="الرئيسي">📷 الرئيسي</option>
+              <option value="الثانوي">🎥 الثانوي</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-success flex-fill" onclick="submitBooking()">تثبيت الطلب ✅</button>
+          <button class="btn btn-primary flex-fill" onclick="sendWhatsapp()">إرسال رسالة واتساب ✉️</button>
+        </div>
+
+        <div id="formMsg" class="mt-3"></div>
+      </div>
+    </div>
+
+    <!-- محاضرات اليوم / الغد / السابقة -->
+    <div class="row g-3">
+      <div class="col-lg-4">
+        <div class="card h-100">
+          <div class="card-header bg-primary text-white">محاضرات اليوم</div>
+          <div class="card-body" id="listToday"><p class="text-muted m-0">جارٍ التحميل…</p></div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card h-100">
+          <div class="card-header bg-info text-white">محاضرات الغد</div>
+          <div class="card-body" id="listTomorrow"><p class="text-muted m-0">جارٍ التحميل…</p></div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card h-100">
+          <div class="card-header bg-secondary text-white">محاضرات سابقة</div>
+          <div class="card-body" id="listPast"><p class="text-muted m-0">جارٍ التحميل…</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
+    // ===== Firebase init =====
     const firebaseConfig = {
       apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
       authDomain: "scudual.firebaseapp.com",
@@ -16,160 +90,246 @@
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-    const db = firebase.firestore();
-  </script>
-</head>
-<body class="bg-light">
-  <div class="container py-4">
-    <div id="greeting" class="mb-4 h4 fw-bold text-center"></div>
+    const db   = firebase.firestore();
 
-    <div class="row mb-4">
-      <div class="col-md-6">
-        <button class="btn btn-primary w-100" onclick="showBookingForm()">📅 حجز موعد</button>
-      </div>
-      <div class="col-md-6">
-        <button class="btn btn-secondary w-100" onclick="showMyBookings()">📋 حجوزاتي</button>
-      </div>
-    </div>
+    // ===== Helpers =====
+    const TIME_RANGES = [
+      "10:00-12:00",
+      "12:00-14:00",
+      "14:00-16:00",
+      "16:00-18:00",
+      "18:00-20:00",
+      "20:00-22:00",
+      "22:00-00:00"
+    ];
 
-    <div id="dynamicContent"></div>
-  </div>
+    function to12(hhmm){
+      let [h,m] = hhmm.split(':').map(Number);
+      const ampm = h>=12? 'م':'ص';
+      h = h%12; if(h===0) h=12;
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
+    }
+    function rangeTo12(r){ const [s,e]=r.split('-'); return `${to12(s)} - ${to12(e)}`; }
+    function startMinutes(r){ const [s] = r.split('-'); const [h,m]=s.split(':').map(Number); return h*60+m; }
 
-  <script>
-    let currentUser;
+    function formatLocal(d){
+      const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+    function tomorrowStr(){ const t = new Date(); t.setDate(t.getDate()+1); return formatLocal(t); }
+    function todayStr(){ return formatLocal(new Date()); }
 
-    auth.onAuthStateChanged(async user => {
-      if (!user) location.href = 'index.html';
-      currentUser = user;
-      const userRef = await db.collection("users").doc(user.uid).get();
-      const userName = userRef.exists && userRef.data().name ? userRef.data().name : user.displayName || "غير معرف";
-      document.getElementById("greeting").innerText = `مرحبا أستاذ ${userName}`;
-      currentUser.displayName = userName;
-    });
-
-    function getTomorrowDate() {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      return tomorrow.toISOString().split("T")[0];
+    function showMsg(el, text, cls){
+      el.className = `mt-3 alert ${cls}`;
+      el.textContent = text;
     }
 
-    function showBookingForm() {
-      const html = `
-        <div class="card p-4 shadow">
-          <h5 class="mb-3">🟢 نموذج الحجز</h5>
-          <p class="fw-bold">👤 الأستاذ: ${currentUser.displayName || "غير معروف"}</p>
-          <div class="row g-3">
-            <div class="col-md-4">
-              <label class="form-label">📅 تاريخ الموعد</label>
-              <input type="date" id="bookingDate" class="form-control" min="${getTomorrowDate()}" max="${getTomorrowDate()}">
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">⏰ وقت التصوير</label>
-              <select id="bookingTime" class="form-select">
-                <option value="">اختر الوقت</option>
-                <option value="08:00">08:00</option>
-                <option value="10:00">10:00</option>
-                <option value="12:00">12:00</option>
-                <option value="14:00">14:00</option>
-                <option value="16:00">16:00</option>
-                <option value="18:00">18:00</option>
-                <option value="20:00">20:00</option>
-                <option value="22:00">22:00</option>
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">🎥 الاستوديو</label>
-              <select id="bookingStudio" class="form-select">
-                <option value="">اختر الاستوديو</option>
-                <option value="الرئيسي">📷 الرئيسي</option>
-                <option value="الثانوي">🎥 الثانوي</option>
-              </select>
-            </div>
-          </div>
-          <div class="text-end mt-3">
-            <button class="btn btn-success" onclick="submitBooking()">تثبيت الحجز</button>
-          </div>
-        </div>
-      `;
-      document.getElementById("dynamicContent").innerHTML = html;
-    }
+    // ===== State =====
+    let currentUser = null;     // Firebase Auth user
+    let teacherDoc  = null;     // users/{doc} (قد يكون docId != authUid)
+    let teacherName = 'أستاذ';
 
-    async function submitBooking() {
-      const date = document.getElementById("bookingDate").value;
-      const time = document.getElementById("bookingTime").value;
-      const studio = document.getElementById("bookingStudio").value;
+    // ===== Auth & bootstrap UI =====
+    auth.onAuthStateChanged(async (u) => {
+      if(!u){ window.location.href = 'login.html'; return; }
+      currentUser = u;
 
-      if (!date || !time || !studio) return alert("يرجى ملء كل الحقول");
+      // جلب وثيقة الأستاذ: أولاً authUid، وإن لم توجد نستخدم docId == uid
+      const q = await db.collection('users').where('authUid','==',u.uid).limit(1).get();
+      if(!q.empty){
+        teacherDoc = q.docs[0];
+      }else{
+        const fallback = await db.collection('users').doc(u.uid).get();
+        if(fallback.exists) teacherDoc = fallback;
+      }
 
-      const existing = await db.collection("bookings")
-        .where("date", "==", date)
-        .where("time", "==", time)
-        .where("studio", "==", studio)
-        .get();
+      teacherName = teacherDoc?.data()?.name || u.displayName || 'أستاذ';
+      document.getElementById('greeting').textContent = `مرحبًا أستاذ ${teacherName}`;
 
-      if (!existing.empty) return alert("⚠️ هذا الموعد محجوز مسبقًا");
-
-      await db.collection("bookings").add({
-        userId: currentUser.uid,
-        userName: currentUser.displayName || "أستاذ",
-        date,
-        time,
-        studio,
-        status: "pending",
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      // تجهيز تاريخ الغد والفترات
+      document.getElementById('bookingDate').value = tomorrowStr();
+      const sel = document.getElementById('bookingTime');
+      TIME_RANGES.forEach(r=>{
+        const opt = document.createElement('option');
+        opt.value = r; opt.textContent = rangeTo12(r);
+        sel.append(opt);
       });
 
-      alert("✅ تم إرسال الطلب بانتظار موافقة الإدارة");
-      showMyBookings();
+      // تحميل القوائم
+      loadLists();
+    });
+
+    async function loadLists(){
+      await Promise.all([
+        loadForDate(todayStr(),    'listToday'),
+        loadForDate(tomorrowStr(), 'listTomorrow'),
+        loadPast('listPast')
+      ]);
     }
 
-    function showMyBookings() {
-      const uid = currentUser?.uid;
-      if (!uid) return;
+    // جلب حجوزات يوم محدد لهذا الأستاذ (بغض النظر عن الحالة) وترتيبها حسب الوقت
+    async function loadForDate(dateStr, containerId){
+      const box = document.getElementById(containerId);
+      box.innerHTML = `<p class="text-muted m-0">جارٍ التحميل…</p>`;
+      if(!currentUser) return;
 
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowStr = tomorrow.toISOString().split("T")[0];
+      try{
+        let snap = await db.collection('bookings')
+          .where('date','==',dateStr)
+          .where('authUid','==',currentUser.uid)
+          .get();
 
-      db.collection("bookings")
-        .where("userId", "==", uid)
-        .where("date", "==", tomorrowStr)
-        .orderBy("date")
-        .get()
-        .then((snap) => {
-          let html = `<h5 class='mb-3'>📋 قائمة حجوزات الغد للأستاذ ${currentUser.displayName || "غير معروف"}</h5>`;
-          if (snap.empty) {
-            html += "<div class='alert alert-warning'>لا توجد حجوزات ليوم الغد</div>";
-          } else {
-            snap.forEach((doc) => {
-              const data = doc.data();
-              html += `
-                <div class="card mb-3 shadow-sm">
-                  <div class="card-body d-flex justify-content-between align-items-center">
-                    <div>
-                      <h6 class="fw-bold">👤 ${data.userName}</h6>
-                      <p class="mb-0">${data.date} - ${data.time} | 📍 ${data.studio} | الحالة: ${statusText(data.status)}</p>
-                    </div>
-                    <a class="btn btn-outline-success" href="https://wa.me/9647855002173?text=أريد%20حجز%20موعد%20بتاريخ%20${data.date}%20بساعة%20${data.time}" target="_blank">
-                      ارسال واتساب
-                    </a>
-                  </div>
+        // دعم البيانات القديمة التي لا تحتوي authUid
+        if(snap.empty && teacherDoc){
+          snap = await db.collection('bookings')
+            .where('date','==',dateStr)
+            .where('userId','==',teacherDoc.id)
+            .get();
+        }
+
+        if(snap.empty){
+          box.innerHTML = `<div class="alert alert-light m-0">لا توجد محاضرات لهذا اليوم.</div>`;
+          return;
+        }
+
+        const items = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+        items.sort((a,b)=> startMinutes(a.time)-startMinutes(b.time));
+
+        let html = '';
+        for(const it of items){
+          const badge = it.status==='active' ? 'bg-success'
+                      : it.status==='pending'? 'bg-warning text-dark'
+                      : it.status==='rejected'? 'bg-danger'
+                      : 'bg-secondary';
+          html += `
+            <div class="d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-white">
+              <div>
+                <div class="fw-bold">${it.userName || teacherName}</div>
+                <div class="text-muted small">${it.date} — ${rangeTo12(it.time)} — ${it.studio}
+                  <span class="badge ${badge} ms-2">${it.status || '—'}</span>
                 </div>
-              `;
-            });
-          }
-          document.getElementById("dynamicContent").innerHTML = html;
-        });
+              </div>
+            </div>`;
+        }
+        box.innerHTML = html;
+      }catch(e){
+        console.error(e);
+        box.innerHTML = `<div class="alert alert-danger m-0">تعذر التحميل.</div>`;
+      }
     }
 
-    function statusText(status) {
-      switch (status) {
-        case "pending": return "🟡 قيد الانتظار";
-        case "active": return "🟢 مؤكد";
-        case "done": return "🔴 منتهي";
-        case "rejected": return "❌ مرفوض";
-        default: return "❓ غير معروف";
+    // محاضرات سابقة (فلترة محلية لتجنب فهرس مركّب)
+    async function loadPast(containerId){
+      const box = document.getElementById(containerId);
+      box.innerHTML = `<p class="text-muted m-0">جارٍ التحميل…</p>`;
+      if(!currentUser) return;
+
+      const today = todayStr();
+
+      try{
+        // 1) جرّب authUid (النموذج الجديد)
+        let snap = await db.collection('bookings')
+          .where('authUid','==',currentUser.uid)
+          .get();
+
+        // 2) دعم قديم: userId == docId
+        if(snap.empty && teacherDoc){
+          snap = await db.collection('bookings')
+            .where('userId','==',teacherDoc.id)
+            .get();
+        }
+
+        if(snap.empty){
+          box.innerHTML = `<div class="alert alert-light m-0">لا توجد محاضرات سابقة.</div>`;
+          return;
+        }
+
+        // فلترة محلية للماضي فقط ثم ترتيب
+        const all  = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        const past = all.filter(it => (it.date || '') < today);
+
+        if(past.length === 0){
+          box.innerHTML = `<div class="alert alert-light m-0">لا توجد محاضرات سابقة.</div>`;
+          return;
+        }
+
+        past.sort((a,b) => (b.date.localeCompare(a.date)) || (startMinutes(b.time)-startMinutes(a.time)));
+
+        let html = '';
+        for(const it of past.slice(0,20)){
+          html += `
+            <div class="d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-white">
+              <div>
+                <div class="fw-bold">${it.userName || teacherName}</div>
+                <div class="text-muted small">${it.date} — ${rangeTo12(it.time)} — ${it.studio}</div>
+              </div>
+            </div>`;
+        }
+        box.innerHTML = html;
+      }catch(e){
+        console.error(e);
+        box.innerHTML = `<div class="alert alert-danger m-0">تعذر التحميل.</div>`;
       }
+    }
+
+    // تثبيت حجز الغد مع منع التكرار
+    async function submitBooking(){
+      const msg = document.getElementById('formMsg');
+      msg.className=''; msg.textContent='';
+
+      if(!currentUser || !teacherDoc){
+        showMsg(msg,'لا يمكن تحديد بيانات الأستاذ. أعد تسجيل الدخول.','alert-danger'); return;
+      }
+
+      const date   = document.getElementById('bookingDate').value;
+      const time   = document.getElementById('bookingTime').value;
+      const studio = document.getElementById('bookingStudio').value;
+
+      if(!date || !time || !studio){
+        showMsg(msg,'يرجى اختيار الفترة والاستوديو.','alert-warning'); return;
+      }
+
+      try{
+        // منع التكرار على مستوى الاستوديو
+        const exist = await db.collection('bookings')
+          .where('date','==',date)
+          .where('time','==',time)
+          .where('studio','==',studio)
+          .get();
+        if(!exist.empty){
+          showMsg(msg,'⚠️ هذا الموعد محجوز بالفعل لنفس الاستوديو.','alert-warning'); return;
+        }
+
+        await db.collection('bookings').add({
+          authUid : currentUser.uid,      // للنسخة الجديدة
+          userId  : teacherDoc.id,        // دعم قديم
+          userName: teacherName,
+          date,
+          time,                           // 24h
+          studio,
+          status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        showMsg(msg,'✅ تم إرسال الطلب بانتظار موافقة الإدارة.','alert-success');
+        loadLists();
+      }catch(e){
+        console.error(e);
+        showMsg(msg,'تعذر إنشاء الحجز.','alert-danger');
+      }
+    }
+
+    // إرسال واتساب
+    function sendWhatsapp(){
+      const date = document.getElementById('bookingDate').value;
+      const time = document.getElementById('bookingTime').value;
+      const studio = document.getElementById('bookingStudio').value;
+      if(!date || !time || !studio){
+        const msg = document.getElementById('formMsg');
+        showMsg(msg,'اختر التاريخ/الوقت/الاستوديو أولًا.','alert-warning'); return;
+      }
+      const text = encodeURIComponent(`مرحبا استوديو نون، أنا الأستاذ ${teacherName}، أريد حجز يوم غد ${date} الساعة ${rangeTo12(time)} في ${studio}`);
+      window.open(`https://wa.me/9647855002173?text=${text}`,'_blank');
     }
   </script>
 </body>
