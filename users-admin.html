@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>إدارة اليوزرية - Scudual</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+
+  <!-- Firebase (Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body{background:#f6f7fb;}
+    .card{box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace}
+  </style>
+</head>
+<body class="py-4">
+  <div class="container" style="max-width:1100px">
+    <h3 class="text-center mb-4">👥 إدارة اليوزرية (بدون تسجيل دخول)</h3>
+
+    <!-- تنبيه أمني -->
+    <div class="alert alert-warning">
+      ⚠️ هذه الصفحة تعمل من الفرونت فقط. لإنشاء/تعديل حسابات الـ <span class="mono">Authentication</span>
+      نستعمل <strong>تطبيق Firebase ثانوي</strong> حتى لا يبدّل جلسة المتصفح. تأكد من قواعد Firestore/Auth
+      لديك بأنها تسمح بهذه العمليات أثناء التطوير. للاستخدام الإنتاجي يُفضَّل السيرفر (Admin SDK).
+    </div>
+
+    <!-- إضافة أستاذ -->
+    <div class="card mb-4">
+      <div class="card-header bg-success text-white">➕ إضافة أستاذ جديد</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">الاسم</label>
+            <input id="addName" class="form-control" placeholder="مثال: أحمد محمد">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">البريد الإلكتروني</label>
+            <input id="addEmail" type="email" class="form-control" placeholder="teacher@example.com">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">كلمة المرور</label>
+            <input id="addPassword" type="password" class="form-control" placeholder="••••••••">
+          </div>
+          <div class="col-md-1">
+            <label class="form-label">الدور</label>
+            <select id="addRole" class="form-select">
+              <option value="teacher" selected>أستاذ</option>
+              <option value="admin">مدير</option>
+            </select>
+          </div>
+        </div>
+        <div class="text-end mt-3">
+          <button class="btn btn-success" onclick="addTeacher()">إضافة</button>
+          <span id="addMsg" class="ms-3"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- جدول الأساتذة -->
+    <div class="card mb-4">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <span>📋 قائمة الأساتذة</span>
+        <button class="btn btn-light btn-sm" onclick="loadTeachers()">تحديث</button>
+      </div>
+      <div class="card-body table-responsive">
+        <table class="table table-striped align-middle text-center bg-white">
+          <thead class="table-light">
+            <tr>
+              <th>الاسم</th>
+              <th>الإيميل</th>
+              <th>الدور</th>
+              <th style="width:280px">إجراءات</th>
+            </tr>
+          </thead>
+          <tbody id="teachersTable">
+            <tr><td colspan="4">جارٍ التحميل...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- تعديل بيانات أستاذ -->
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white">✏️ تعديل أستاذ</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">المعرف (UID)</label>
+            <input id="editUid" class="form-control mono" placeholder="اختر من الجدول" readonly>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">الاسم</label>
+            <input id="editName" class="form-control">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">الدور</label>
+            <select id="editRole" class="form-select">
+              <option value="teacher">أستاذ</option>
+              <option value="admin">مدير</option>
+            </select>
+          </div>
+          <div class="col-md-1 d-flex align-items-end">
+            <button class="btn btn-primary w-100" onclick="updateTeacher()">حفظ</button>
+          </div>
+        </div>
+        <div id="editMsg" class="mt-3"></div>
+      </div>
+    </div>
+
+    <!-- تغيير كلمة مرور (بالدخول المؤقت على التطبيق الثانوي) -->
+    <div class="card">
+      <div class="card-header bg-info text-white">🔑 تغيير كلمة مرور لحساب موجود</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">إيميل الحساب</label>
+            <input id="pwEmail" type="email" class="form-control" placeholder="teacher@example.com">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">كلمة المرور الحالية</label>
+            <input id="pwOld" type="password" class="form-control" placeholder="كلمة المرور الحالية">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">كلمة مرور جديدة</label>
+            <input id="pwNew" type="password" class="form-control" placeholder="كلمة المرور الجديدة">
+          </div>
+          <div class="col-md-1 d-flex align-items-end">
+            <button class="btn btn-info w-100" onclick="changePassword()">تغيير</button>
+          </div>
+        </div>
+        <div id="pwMsg" class="mt-3"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // إعداد Firebase (التطبيق الأساسي لقراءة/كتابة Firestore)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
+      authDomain: "scudual.firebaseapp.com",
+      projectId: "scudual"
+    };
+    const mainApp = firebase.initializeApp(firebaseConfig);
+    const db = mainApp.firestore();
+
+    // تطبيق ثانوي لإدارة Authentication بدون تغيير جلسة التطبيق الأساسي
+    const adminApp = firebase.initializeApp(firebaseConfig, 'adminApp');
+    const adminAuth = adminApp.auth();
+
+    const teachersTable = document.getElementById('teachersTable');
+
+    // تحميل الأساتذة
+    async function loadTeachers() {
+      teachersTable.innerHTML = `<tr><td colspan="4">جارٍ التحميل...</td></tr>`;
+      try {
+        const snap = await db.collection('users').where('role','in',['teacher','admin']).get();
+        if (snap.empty) {
+          teachersTable.innerHTML = `<tr><td colspan="4">لا يوجد أساتذة.</td></tr>`;
+          return;
+        }
+        teachersTable.innerHTML = '';
+        snap.forEach(doc => {
+          const {name='', role='teacher', email=''} = doc.data();
+          teachersTable.innerHTML += `
+            <tr>
+              <td>${name}</td>
+              <td>${email || '<span class="text-muted">—</span>'}</td>
+              <td>${role}</td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="fillEdit('${doc.id}','${escapeHtml(name)}','${role}')">تعديل</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteTeacherDoc('${doc.id}')">حذف (Firestore)</button>
+              </td>
+            </tr>
+          `;
+        });
+      } catch (e) {
+        console.error(e);
+        teachersTable.innerHTML = `<tr><td colspan="4" class="text-danger">فشل التحميل</td></tr>`;
+      }
+    }
+
+    // إضافة أستاذ + إنشاء حساب Auth عبر التطبيق الثانوي
+    async function addTeacher() {
+      const name = document.getElementById('addName').value.trim();
+      const email = document.getElementById('addEmail').value.trim();
+      const pass  = document.getElementById('addPassword').value;
+      const role  = document.getElementById('addRole').value;
+      const msgEl = document.getElementById('addMsg');
+      msgEl.className=''; msgEl.textContent='';
+
+      if (!name || !email || !pass) {
+        msgEl.className='text-danger'; msgEl.textContent='يرجى إدخال الاسم والإيميل وكلمة المرور';
+        return;
+      }
+
+      try {
+        // 1) إنشاء حساب Auth (سيسجل دخول على تطبيق adminApp فقط)
+        const cred = await adminAuth.createUserWithEmailAndPassword(email, pass);
+        const uid = cred.user.uid;
+
+        // 2) إنشاء وثيقة Firestore
+        await db.collection('users').doc(uid).set({ name, role, email });
+
+        // 3) تسجيل خروج من التطبيق الثانوي (للبقاء نظيف)
+        await adminAuth.signOut();
+
+        msgEl.className='text-success'; msgEl.textContent='✅ تم إنشاء الحساب وإضافته';
+        // تفريغ الحقول
+        document.getElementById('addName').value = '';
+        document.getElementById('addEmail').value = '';
+        document.getElementById('addPassword').value = '';
+        document.getElementById('addRole').value = 'teacher';
+
+        loadTeachers();
+      } catch (e) {
+        console.error(e);
+        msgEl.className='text-danger';
+        msgEl.textContent = 'حدث خطأ أثناء الإنشاء: ' + (e?.message || e);
+      }
+    }
+
+    // تعبئة فورم التعديل
+    function fillEdit(uid, name, role) {
+      document.getElementById('editUid').value = uid;
+      document.getElementById('editName').value = unescapeHtml(name);
+      document.getElementById('editRole').value = role || 'teacher';
+      document.getElementById('editMsg').innerHTML = '';
+      window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'});
+    }
+
+    // حفظ التعديل (Firestore فقط)
+    async function updateTeacher() {
+      const uid  = document.getElementById('editUid').value.trim();
+      const name = document.getElementById('editName').value.trim();
+      const role = document.getElementById('editRole').value;
+      const msg  = document.getElementById('editMsg');
+
+      msg.className=''; msg.textContent='';
+      if (!uid || !name) { msg.className='text-danger'; msg.textContent='اختر أستاذًا من الجدول ثم عدّل الاسم/الدور'; return; }
+
+      try {
+        await db.collection('users').doc(uid).update({ name, role });
+        msg.className='text-success'; msg.textContent='✅ تم الحفظ';
+        loadTeachers();
+      } catch (e) {
+        console.error(e);
+        msg.className='text-danger'; msg.textContent='فشل التعديل';
+      }
+    }
+
+    // حذف وثيقة Firestore (لا يحذف حساب Auth)
+    async function deleteTeacherDoc(uid) {
+      if (!confirm('تأكيد حذف الأستاذ من Firestore؟')) return;
+      try {
+        await db.collection('users').doc(uid).delete();
+        loadTeachers();
+      } catch (e) {
+        console.error(e);
+        alert('فشل الحذف');
+      }
+    }
+
+    // تغيير كلمة مرور لحساب موجود (نسجّل دخول مؤقتًا في التطبيق الثانوي بنفس الحساب)
+    async function changePassword() {
+      const email = document.getElementById('pwEmail').value.trim();
+      const oldPw = document.getElementById('pwOld').value;
+      const newPw = document.getElementById('pwNew').value;
+      const msgEl = document.getElementById('pwMsg');
+
+      msgEl.className=''; msgEl.textContent='';
+
+      if (!email || !oldPw || !newPw) {
+        msgEl.className='text-danger'; msgEl.textContent='أدخل الإيميل وكلمة المرور الحالية والجديدة';
+        return;
+      }
+
+      try {
+        // تسجيل دخول في adminApp كمستخدم الهدف
+        await adminAuth.signInWithEmailAndPassword(email, oldPw);
+        await adminAuth.currentUser.updatePassword(newPw);
+        await adminAuth.signOut();
+        msgEl.className='text-success'; msgEl.textContent='✅ تم تغيير كلمة المرور';
+        document.getElementById('pwEmail').value='';
+        document.getElementById('pwOld').value='';
+        document.getElementById('pwNew').value='';
+      } catch (e) {
+        console.error(e);
+        msgEl.className='text-danger';
+        msgEl.textContent='تعذر تغيير كلمة المرور: ' + (e?.message || e);
+      }
+    }
+
+    // Helpers: HTML escaping
+    function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+    function unescapeHtml(s){const e=document.createElement('textarea'); e.innerHTML=s; return e.value;}
+
+    // بدء
+    window.onload = loadTeachers;
+  </script>
+</body>
+</html>
