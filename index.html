@@ -3,139 +3,96 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>حجز موعد - Scudual</title>
+  <title>صفحة الأستاذ - الحجوزات</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
-  
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-
   <style>
-    .hide{display:none;}
+    body{background:#f6f7fb}
+    .card{box-shadow:0 2px 10px rgba(0,0,0,.05)}
   </style>
 </head>
-<body class="bg-light">
-  <div class="container py-5" style="max-width:1000px">
+<body class="py-4">
+  <div class="container" style="max-width:1100px">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="m-0" id="greeting">مرحبًا أستاذ …</h4>
+      <button class="btn btn-outline-danger btn-sm" id="btnSignOut" onclick="auth.signOut()">تسجيل خروج</button>
+    </div>
 
-    <!-- ====== بطاقة تسجيل الدخول ====== -->
-    <div id="authCard" class="card shadow-sm mb-4">
+    <!-- بطاقة الحجز -->
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>حجز موعد تصوير (لغد فقط)</span>
+        <span class="small text-muted">🗓️</span>
+      </div>
       <div class="card-body">
-        <h4 class="mb-3">🔐 تسجيل الدخول</h4>
         <div class="row g-3">
-          <div class="col-md-5">
-            <label class="form-label">البريد الإلكتروني</label>
-            <input type="email" id="email" class="form-control" placeholder="name@example.com">
+          <div class="col-md-4">
+            <label class="form-label">تاريخ الموعد</label>
+            <input type="date" id="bookingDate" class="form-control" readonly>
           </div>
-          <div class="col-md-5">
-            <label class="form-label">كلمة المرور</label>
-            <input type="password" id="password" class="form-control" placeholder="••••••••">
+          <div class="col-md-4">
+            <label class="form-label">الفترة الزمنية</label>
+            <select id="bookingTime" class="form-select">
+              <option value="">اختر الفترة</option>
+            </select>
           </div>
-          <div class="col-md-2 d-flex align-items-end">
-            <button class="btn btn-primary w-100" onclick="signIn()">دخول</button>
+          <div class="col-md-4">
+            <label class="form-label">الاستوديو</label>
+            <select id="bookingStudio" class="form-select">
+              <option value="">اختر الاستوديو</option>
+              <option value="الرئيسي">📷 الرئيسي</option>
+              <option value="الثانوي">🎥 الثانوي</option>
+            </select>
           </div>
         </div>
-        <div id="authMsg" class="mt-3 text-danger small"></div>
+
+        <div class="d-flex gap-2 mt-3">
+          <button class="btn btn-success flex-fill" onclick="submitBooking()">تثبيت الطلب ✅</button>
+          <button class="btn btn-primary flex-fill" onclick="sendWhatsapp()">إرسال رسالة واتساب ✉️</button>
+        </div>
+
+        <div id="formMsg" class="mt-3"></div>
       </div>
     </div>
-    <!-- ====== نهاية تسجيل الدخول ====== -->
 
-    <!-- ====== محتوى التطبيق بعد الدخول ====== -->
-    <div id="appCard" class="hide">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 id="greeting" class="mb-0"></h4>
-        <button class="btn btn-outline-danger btn-sm" onclick="signOut()">تسجيل خروج</button>
-      </div>
-
-      <div class="card shadow-sm mb-4">
-        <div class="card-body">
-          <h5 class="mb-4">📅 حجز موعد تصوير (لغدٍ فقط)</h5>
-
-          <div class="row g-3">
-            <!-- تاريخ الغد تلقائي -->
-            <div class="col-md-4">
-              <label class="form-label">📆 تاريخ الموعد</label>
-              <input type="date" id="bookingDate" class="form-control" readonly>
-            </div>
-
-            <!-- الفترات الزمنية (عرض 12 ساعة) -->
-            <div class="col-md-4">
-              <label class="form-label">🕒 الفترة الزمنية</label>
-              <select id="bookingTime" class="form-select">
-                <option value="">اختر الفترة</option>
-              </select>
-            </div>
-
-            <!-- الاستوديو -->
-            <div class="col-md-4">
-              <label class="form-label">🎬 الاستوديو</label>
-              <select id="bookingStudio" class="form-select">
-                <option value="">اختر الاستوديو</option>
-                <option value="الرئيسي">📷 الرئيسي</option>
-                <option value="الثانوي">🎥 الثانوي</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- الأزرار -->
-          <div class="d-flex gap-2 mt-4">
-            <button class="btn btn-success flex-fill" onclick="submitBooking()">✅ تثبيت الطلب</button>
-            <button class="btn btn-primary flex-fill" onclick="sendWhatsapp()">📩 إرسال رسالة واتساب</button>
-          </div>
-
-          <div id="msg" class="text-center mt-3"></div>
+    <!-- محاضرات اليوم / الغد / السابقة -->
+    <div class="row g-3">
+      <div class="col-lg-4">
+        <div class="card h-100">
+          <div class="card-header bg-primary text-white">محاضرات اليوم</div>
+          <div class="card-body" id="listToday"><p class="text-muted m-0">جارٍ التحميل…</p></div>
         </div>
       </div>
-
-      <!-- شبكة المحاضرات: اليوم + الغد + السابقة -->
-      <div class="row g-3">
-        <!-- محاضرات اليوم -->
-        <div class="col-lg-4">
-          <div class="card shadow-sm h-100">
-            <div class="card-header bg-primary text-white">📗 محاضرات اليوم</div>
-            <div class="card-body" id="todayBookings">
-              <p class="text-muted mb-0">جارٍ التحميل...</p>
-            </div>
-          </div>
+      <div class="col-lg-4">
+        <div class="card h-100">
+          <div class="card-header bg-info text-white">محاضرات الغد</div>
+          <div class="card-body" id="listTomorrow"><p class="text-muted m-0">جارٍ التحميل…</p></div>
         </div>
-
-        <!-- محاضرات الغد -->
-        <div class="col-lg-4">
-          <div class="card shadow-sm h-100">
-            <div class="card-header bg-info text-white">📘 محاضرات الغد</div>
-            <div class="card-body" id="tomorrowBookings">
-              <p class="text-muted mb-0">جارٍ التحميل...</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- محاضرات سابقة -->
-        <div class="col-lg-4">
-          <div class="card shadow-sm h-100">
-            <div class="card-header bg-secondary text-white">🗂️ محاضرات سابقة</div>
-            <div class="card-body" id="pastBookings">
-              <p class="text-muted mb-0">جارٍ التحميل...</p>
-            </div>
-          </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="card h-100">
+          <div class="card-header bg-secondary text-white">محاضرات سابقة</div>
+          <div class="card-body" id="listPast"><p class="text-muted m-0">جارٍ التحميل…</p></div>
         </div>
       </div>
     </div>
-    <!-- ====== نهاية محتوى التطبيق ====== -->
-
   </div>
 
   <script>
-    // تهيئة Firebase
+    // ===== Firebase init =====
     const firebaseConfig = {
       apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
       authDomain: "scudual.firebaseapp.com",
       projectId: "scudual"
     };
     firebase.initializeApp(firebaseConfig);
-    const db   = firebase.firestore();
     const auth = firebase.auth();
+    const db   = firebase.firestore();
 
-    // أزمنة 24 ساعة (تُعرض 12 ساعة)
+    // ===== Helpers =====
     const TIME_RANGES = [
       "10:00-12:00",
       "12:00-14:00",
@@ -146,291 +103,229 @@
       "22:00-00:00"
     ];
 
-    // تحويلات الوقت
-    function to12(hhmm) {
-      if (!hhmm) return '';
-      let [h, m] = hhmm.split(':').map(Number);
-      const ampm = h >= 12 ? 'م' : 'ص';
-      let h12 = h % 12; if (h12 === 0) h12 = 12;
-      return `${h12.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')} ${ampm}`;
+    function to12(hhmm){
+      let [h,m] = hhmm.split(':').map(Number);
+      const ampm = h>=12? 'م':'ص';
+      h = h%12; if(h===0) h=12;
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${ampm}`;
     }
-    function rangeTo12(range) {
-      if (!range || !range.includes('-')) return range || '';
-      const [s, e] = range.split('-');
-      return `${to12(s)} - ${to12(e)}`;
+    function rangeTo12(r){ const [s,e]=r.split('-'); return `${to12(s)} - ${to12(e)}`; }
+    function startMinutes(r){ const [s] = r.split('-'); const [h,m]=s.split(':').map(Number); return h*60+m; }
+
+    function formatLocal(d){
+      const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+    function tomorrowStr(){
+      const t = new Date(); t.setDate(t.getDate()+1); return formatLocal(t);
+    }
+    function todayStr(){ return formatLocal(new Date()); }
+
+    function showMsg(el, text, cls){
+      el.className = `mt-3 alert ${cls}`;
+      el.textContent = text;
     }
 
-    // إعداد خيارات الوقت
-    function setupTimes() {
-      const sel = document.getElementById("bookingTime");
-      sel.querySelectorAll('option:not(:first-child)').forEach(o => o.remove());
-      TIME_RANGES.forEach(r => {
+    // ===== State =====
+    let currentUser = null;     // Firebase Auth user
+    let teacherDoc  = null;     // users/{doc} (قد يكون docId != authUid)
+    let teacherName = 'أستاذ';
+
+    // ===== Auth & bootstrap UI =====
+    auth.onAuthStateChanged(async (u) => {
+      if(!u){ window.location.href = 'login.html'; return; }
+      currentUser = u;
+
+      // جلب وثيقة الأستاذ: أولاً authUid، وإن لم توجد نستخدم docId == uid
+      const q = await db.collection('users').where('authUid','==',u.uid).limit(1).get();
+      if(!q.empty){
+        teacherDoc = q.docs[0];
+      }else{
+        const fallback = await db.collection('users').doc(u.uid).get();
+        if(fallback.exists) teacherDoc = fallback;
+      }
+
+      teacherName = teacherDoc?.data()?.name || u.displayName || 'أستاذ';
+      document.getElementById('greeting').textContent = `مرحبًا أستاذ ${teacherName}`;
+
+      // تجهيز تاريخ الغد والفترات
+      document.getElementById('bookingDate').value = tomorrowStr();
+      const sel = document.getElementById('bookingTime');
+      TIME_RANGES.forEach(r=>{
         const opt = document.createElement('option');
-        opt.value = r;                 // نخزن 24 ساعة
-        opt.textContent = rangeTo12(r);
+        opt.value = r; opt.textContent = rangeTo12(r);
         sel.append(opt);
       });
-    }
 
-    // تنسيقات التاريخ المحلي yyyy-mm-dd
-    function fmtDate(d){
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    }
-
-    // تاريخ الغد
-    function setupTomorrow() {
-      const inp = document.getElementById("bookingDate");
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      inp.value = fmtDate(d);
-    }
-
-    // حالة المستخدم + بروفايل
-    let currentUser = null;
-    let teacherProfile = null; // {name, role}
-
-    auth.onAuthStateChanged(async (user) => {
-      if (!user) {
-        document.getElementById('authCard').classList.remove('hide');
-        document.getElementById('appCard').classList.add('hide');
-        return;
-      }
-      currentUser = user;
-
-      // تحميل الاسم من users/{uid}
-      const prof = await db.collection('users').doc(user.uid).get();
-      teacherProfile = prof.exists ? prof.data() : { name: user.displayName || 'أستاذ', role: 'teacher' };
-
-      document.getElementById('greeting').innerText = `مرحبا أستاذ ${teacherProfile.name || 'أستاذ'}`;
-      document.getElementById('authCard').classList.add('hide');
-      document.getElementById('appCard').classList.remove('hide');
-
-      setupTomorrow();
-      setupTimes();
-      loadTodayBookings();
-      loadTomorrowBookings();
-      loadPastBookings();
+      // تحميل القوائم
+      loadLists();
     });
 
-    // تسجيل الدخول
-    async function signIn() {
-      const email = document.getElementById('email').value.trim();
-      const pass  = document.getElementById('password').value.trim();
-      const msgEl = document.getElementById('authMsg');
-      msgEl.textContent = '';
+    async function loadLists(){
+      await Promise.all([
+        loadForDate(todayStr(),    'listToday'),
+        loadForDate(tomorrowStr(), 'listTomorrow'),
+        loadPast('listPast')
+      ]);
+    }
 
-      if (!email || !pass) {
-        msgEl.textContent = 'يرجى إدخال البريد وكلمة المرور';
-        return;
-      }
-      try {
-        await auth.signInWithEmailAndPassword(email, pass);
-      } catch (e) {
+    // جلب حجوزات يوم محدد لهذا الأستاذ (بغض النظر عن الحالة) وترتيبها حسب الوقت
+    async function loadForDate(dateStr, containerId){
+      const box = document.getElementById(containerId);
+      box.innerHTML = `<p class="text-muted m-0">جارٍ التحميل…</p>`;
+      if(!currentUser) return;
+
+      try{
+        let snap = await db.collection('bookings')
+          .where('date','==',dateStr)
+          .where('authUid','==',currentUser.uid)
+          .get();
+
+        // دعم البيانات القديمة التي لا تحتوي authUid
+        if(snap.empty && teacherDoc){
+          snap = await db.collection('bookings')
+            .where('date','==',dateStr)
+            .where('userId','==',teacherDoc.id)
+            .get();
+        }
+
+        if(snap.empty){
+          box.innerHTML = `<div class="alert alert-light m-0">لا توجد محاضرات لهذا اليوم.</div>`;
+          return;
+        }
+
+        const items = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+        items.sort((a,b)=> startMinutes(a.time)-startMinutes(b.time));
+
+        let html = '';
+        for(const it of items){
+          const badge = it.status==='active' ? 'bg-success'
+                      : it.status==='pending'? 'bg-warning text-dark'
+                      : it.status==='rejected'? 'bg-danger'
+                      : 'bg-secondary';
+          html += `
+            <div class="d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-white">
+              <div>
+                <div class="fw-bold">${it.userName || teacherName}</div>
+                <div class="text-muted small">${it.date} — ${rangeTo12(it.time)} — ${it.studio}
+                  <span class="badge ${badge} ms-2">${it.status || '—'}</span>
+                </div>
+              </div>
+            </div>`;
+        }
+        box.innerHTML = html;
+      }catch(e){
         console.error(e);
-        msgEl.textContent = 'تعذر تسجيل الدخول. تحقق من البيانات.';
+        box.innerHTML = `<div class="alert alert-danger m-0">تعذر التحميل.</div>`;
       }
     }
-    function signOut() { auth.signOut(); }
 
-    // تثبيت الحجز (لغد فقط)
-    async function submitBooking() {
-      const msg = document.getElementById("msg");
-      msg.className = "text-center text-danger";
-      msg.textContent = "";
+    // محاضرات سابقة (آخر 10 مثلاً)
+    async function loadPast(containerId){
+      const box = document.getElementById(containerId);
+      box.innerHTML = `<p class="text-muted m-0">جارٍ التحميل…</p>`;
+      if(!currentUser) return;
 
-      if (!currentUser) { msg.textContent = "يرجى تسجيل الدخول أولاً"; return; }
+      const today = todayStr();
 
-      const date   = document.getElementById("bookingDate").value;
-      const time   = document.getElementById("bookingTime").value; // 24h
-      const studio = document.getElementById("bookingStudio").value;
-      const teacherName = teacherProfile?.name || 'أستاذ';
-
-      if (!date || !time || !studio) { msg.textContent = "يرجى اختيار الوقت والاستوديو"; return; }
-
-      // منع التكرار لنفس (date/time/studio)
-      const exist = await db.collection("bookings")
-        .where("date","==",date)
-        .where("time","==",time)
-        .where("studio","==",studio)
-        .get();
-      if (!exist.empty) { msg.textContent = "⚠️ تم حجز هذا الموعد مسبقًا"; return; }
-
-      await db.collection("bookings").add({
-        userId: currentUser.uid,
-        userName: teacherName,
-        date,
-        time,
-        studio,
-        status: "pending",
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-
-      msg.className = "text-center text-success";
-      msg.textContent = "✅ تم إرسال طلبك بانتظار الموافقة";
-
-      // تحديث القوائم
-      loadTodayBookings();
-      loadTomorrowBookings();
-      loadPastBookings();
-    }
-
-    // واتساب بالتفاصيل
-    function sendWhatsapp() {
-      const msg = document.getElementById("msg");
-      msg.textContent = "";
-      if (!currentUser) { msg.textContent = "يرجى تسجيل الدخول أولاً"; return; }
-
-      const teacherName = teacherProfile?.name || "أستاذ";
-      const date  = document.getElementById("bookingDate").value;
-      const time24 = document.getElementById("bookingTime").value;
-      if (!date || !time24) { msg.textContent = "يرجى اختيار الوقت أولاً"; return; }
-      const time12 = rangeTo12(time24);
-      const text = encodeURIComponent(
-        `مرحبا استوديو نون، أنا الأستاذ ${teacherName}، أريد حجز يوم غد ${date} الساعة ${time12}`
-      );
-      window.open(`https://wa.me/9647855002173?text=${text}`, "_blank");
-    }
-
-    // شارة الحالة
-    function statusBadge(s) {
-      return s === 'active'   ? '<span class="badge bg-success ms-2">مؤكد</span>' :
-             s === 'pending'  ? '<span class="badge bg-warning text-dark ms-2">بانتظار</span>' :
-             s === 'rejected' ? '<span class="badge bg-danger ms-2">مرفوض</span>' :
-                                 '<span class="badge bg-secondary ms-2">غير معلوم</span>';
-    }
-
-    // ====== محاضرات اليوم (مرتبة تصاعديًا) ======
-    async function loadTodayBookings() {
-      const box = document.getElementById('todayBookings');
-      box.innerHTML = `<p class="text-muted mb-0">جارٍ التحميل...</p>`;
-      if (!currentUser) return;
-
-      const d = new Date();
-      const todayStr = fmtDate(d);
-
-      try {
-        const snap = await db.collection('bookings')
-          .where('userId','==', currentUser.uid)
-          .where('date','==', todayStr)
+      try{
+        let snap = await db.collection('bookings')
+          .where('authUid','==',currentUser.uid)
+          .where('date','<',today)
           .get();
 
-        if (snap.empty) {
-          box.innerHTML = `<div class="alert alert-secondary mb-0">لا توجد محاضرات اليوم.</div>`;
+        if(snap.empty && teacherDoc){
+          snap = await db.collection('bookings')
+            .where('userId','==',teacherDoc.id)
+            .where('date','<',today)
+            .get();
+        }
+
+        if(snap.empty){
+          box.innerHTML = `<div class="alert alert-light m-0">لا توجد محاضرات سابقة.</div>`;
           return;
         }
 
-        const arr = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        arr.sort((a,b) => (a.time || '').localeCompare(b.time || '')); // تصاعدي
+        const items = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+        // رتب حسب التاريخ تنازلي ثم الوقت تنازلي
+        items.sort((a,b)=> (b.date.localeCompare(a.date)) || (startMinutes(b.time)-startMinutes(a.time)));
 
-        let html = '<div class="list-group">';
-        arr.forEach(it => {
+        let html = '';
+        for(const it of items.slice(0,20)){
           html += `
-            <div class="list-group-item d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-white">
               <div>
-                <strong>${it.userName || 'أستاذ'}</strong> — ${it.date} — ${rangeTo12(it.time)} — ${it.studio}
-                ${statusBadge(it.status)}
+                <div class="fw-bold">${it.userName || teacherName}</div>
+                <div class="text-muted small">${it.date} — ${rangeTo12(it.time)} — ${it.studio}</div>
               </div>
             </div>`;
-        });
-        html += '</div>';
+        }
         box.innerHTML = html;
-      } catch (e) {
-        console.error('خطأ تحميل محاضرات اليوم:', e);
-        box.innerHTML = `<div class="alert alert-danger mb-0">تعذر تحميل محاضرات اليوم.</div>`;
+      }catch(e){
+        console.error(e);
+        box.innerHTML = `<div class="alert alert-danger m-0">تعذر التحميل.</div>`;
       }
     }
 
-    // ====== محاضرات الغد (مرتبة تصاعديًا) ======
-    async function loadTomorrowBookings() {
-      const box = document.getElementById('tomorrowBookings');
-      box.innerHTML = `<p class="text-muted mb-0">جارٍ التحميل...</p>`;
-      if (!currentUser) return;
+    // تثبيت حجز الغد مع منع التكرار
+    async function submitBooking(){
+      const msg = document.getElementById('formMsg');
+      msg.className=''; msg.textContent='';
 
-      const d = new Date();
-      d.setDate(d.getDate() + 1);
-      const tomorrowStr = fmtDate(d);
+      if(!currentUser || !teacherDoc){
+        showMsg(msg,'لا يمكن تحديد بيانات الأستاذ. أعد تسجيل الدخول.','alert-danger'); return;
+      }
 
-      try {
-        const snap = await db.collection('bookings')
-          .where('userId','==', currentUser.uid)
-          .where('date','==', tomorrowStr)
+      const date   = document.getElementById('bookingDate').value;
+      const time   = document.getElementById('bookingTime').value;
+      const studio = document.getElementById('bookingStudio').value;
+
+      if(!date || !time || !studio){
+        showMsg(msg,'يرجى اختيار الفترة والاستوديو.','alert-warning'); return;
+      }
+
+      try{
+        // منع التكرار على مستوى الاستوديو
+        const exist = await db.collection('bookings')
+          .where('date','==',date)
+          .where('time','==',time)
+          .where('studio','==',studio)
           .get();
-
-        if (snap.empty) {
-          box.innerHTML = `<div class="alert alert-secondary mb-0">لا توجد محاضرات للغد.</div>`;
-          return;
+        if(!exist.empty){
+          showMsg(msg,'⚠️ هذا الموعد محجوز بالفعل لنفس الاستوديو.','alert-warning'); return;
         }
 
-        const arr = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        arr.sort((a,b) => (a.time || '').localeCompare(b.time || '')); // تصاعدي
-
-        let html = '<div class="list-group">';
-        arr.forEach(it => {
-          html += `
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-              <div>
-                <strong>${it.userName || 'أستاذ'}</strong> — ${it.date} — ${rangeTo12(it.time)} — ${it.studio}
-                ${statusBadge(it.status)}
-              </div>
-            </div>`;
+        await db.collection('bookings').add({
+          authUid : currentUser.uid,      // للنسخة الجديدة
+          userId  : teacherDoc.id,        // دعم قديم
+          userName: teacherName,
+          date,
+          time,                           // 24h
+          studio,
+          status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
-        html += '</div>';
-        box.innerHTML = html;
-      } catch (e) {
-        console.error('خطأ تحميل محاضرات الغد:', e);
-        box.innerHTML = `<div class="alert alert-danger mb-0">تعذر تحميل محاضرات الغد.</div>`;
+
+        showMsg(msg,'✅ تم إرسال الطلب بانتظار موافقة الإدارة.','alert-success');
+        loadLists();
+      }catch(e){
+        console.error(e);
+        showMsg(msg,'تعذر إنشاء الحجز.','alert-danger');
       }
     }
 
-    // ====== محاضرات سابقة (تاريخ أقل من اليوم — تنازليًا) ======
-    async function loadPastBookings() {
-      const box = document.getElementById('pastBookings');
-      box.innerHTML = `<p class="text-muted mb-0">جارٍ التحميل...</p>`;
-      if (!currentUser) return;
-
-      const today = new Date();
-      const todayStr = fmtDate(today);
-
-      try {
-        const snap = await db.collection('bookings')
-          .where('userId','==', currentUser.uid)
-          .where('date','<', todayStr)
-          .get();
-
-        if (snap.empty) {
-          box.innerHTML = `<div class="alert alert-secondary mb-0">لا توجد محاضرات سابقة.</div>`;
-          return;
-        }
-
-        const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        arr.sort((a,b) => (b.date || '').localeCompare(a.date || '') || (b.time || '').localeCompare(a.time || '')); // تنازلي
-
-        let html = '<div class="list-group">';
-        arr.forEach(it => {
-          html += `
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-              <div>
-                <strong>${it.userName || 'أستاذ'}</strong> — ${it.date} — ${rangeTo12(it.time)} — ${it.studio}
-                ${statusBadge(it.status)}
-              </div>
-            </div>`;
-        });
-        html += '</div>';
-        box.innerHTML = html;
-      } catch (e) {
-        console.error('خطأ تحميل المحاضرات السابقة:', e);
-        box.innerHTML = `<div class="alert alert-danger mb-0">تعذر تحميل المحاضرات السابقة.</div>`;
+    // إرسال واتساب
+    function sendWhatsapp(){
+      const date = document.getElementById('bookingDate').value;
+      const time = document.getElementById('bookingTime').value;
+      const studio = document.getElementById('bookingStudio').value;
+      if(!date || !time || !studio){
+        const msg = document.getElementById('formMsg');
+        showMsg(msg,'اختر التاريخ/الوقت/الاستوديو أولًا.','alert-warning'); return;
       }
+      const text = encodeURIComponent(`مرحبا استوديو نون، أنا الأستاذ ${teacherName}، أريد حجز يوم غد ${date} الساعة ${rangeTo12(time)} في ${studio}`);
+      window.open(`https://wa.me/9647855002173?text=${text}`,'_blank');
     }
-
-    // بدء التشغيل
-    window.onload = () => {
-      setupTimes();
-      setupTomorrow();
-    };
   </script>
 </body>
 </html>
