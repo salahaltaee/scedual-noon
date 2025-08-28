@@ -1,128 +1,261 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>إدارة المستخدمين - Scudual</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <title>إدارة اليوزرية - Scudual</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <style>
+    body{background:#f6f7fb}
+    .card{box-shadow:0 2px 10px rgba(0,0,0,.05)}
+    .mono{font-family: ui-monospace, Menlo, Monaco, Consolas, monospace}
+    .small-muted{font-size:.9rem;color:#6c757d}
+  </style>
 </head>
-<body class="bg-light">
+<body class="py-4">
+  <div class="container" style="max-width:1100px">
+    <h3 class="text-center mb-4">👥 إدارة المستخدمين (ربط الأساتذة بحسابات دخول)</h3>
 
-<div class="container my-5">
-  <h3 class="text-center mb-4">إدارة المستخدمين</h3>
-
-  <!-- ✅ إضافة مستخدم -->
-  <div class="card mb-4">
-    <div class="card-header bg-primary text-white">➕ إضافة مستخدم جديد</div>
-    <div class="card-body">
-      <form id="addUserForm" class="row g-3">
-        <div class="col-md-3">
-          <input type="text" id="name" class="form-control" placeholder="اسم المستخدم" required>
-        </div>
-        <div class="col-md-3">
-          <input type="email" id="email" class="form-control" placeholder="البريد الإلكتروني" required>
-        </div>
-        <div class="col-md-3">
-          <input type="password" id="password" class="form-control" placeholder="كلمة المرور" required>
-        </div>
-        <div class="col-md-2">
-          <select id="role" class="form-select" required>
-            <option value="teacher">أستاذ</option>
-            <option value="admin">مدير</option>
-          </select>
-        </div>
-        <div class="col-md-1">
-          <button type="submit" class="btn btn-success w-100">إضافة</button>
-        </div>
-      </form>
-      <div id="addUserMsg" class="mt-3 text-success text-center"></div>
+    <div class="alert alert-warning">
+      ⚠️ يتم إنشاء حسابات الدخول عبر <b>تطبيق Firebase ثانوي</b> حتى لا تتغير جلسة المتصفح.
+      للبيئة الإنتاجية يُفضَّل تنفيذ هذه العمليات عبر السيرفر (Admin SDK).
     </div>
+
+    <!-- إضافة أستاذ جديد (اختياري) -->
+    <div class="card mb-4">
+      <div class="card-header bg-success text-white">➕ إضافة أستاذ جديد (اختياري)</div>
+      <div class="card-body">
+        <form id="addForm" class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">الاسم</label>
+            <input id="addName" class="form-control" placeholder="مثال: أحمد محمد" required>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">الدور</label>
+            <select id="addRole" class="form-select">
+              <option value="teacher" selected>أستاذ</option>
+              <option value="admin">مدير</option>
+            </select>
+          </div>
+          <div class="col-md-5 d-flex align-items-end">
+            <button class="btn btn-success">إضافة في Firestore فقط</button>
+            <span id="addMsg" class="ms-3"></span>
+          </div>
+        </form>
+        <div class="small-muted mt-2">يمكنك لاحقًا ربطه بإيميل/باسورد من الجدول بالأسفل.</div>
+      </div>
+    </div>
+
+    <!-- قائمة الأساتذة -->
+    <div class="card">
+      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+        <span>📋 قائمة الأساتذة</span>
+        <button class="btn btn-light btn-sm" onclick="loadTeachers()">تحديث</button>
+      </div>
+      <div class="card-body">
+        <div id="listMsg" class="mb-3 text-muted">جارٍ التحميل...</div>
+        <div class="table-responsive">
+          <table class="table table-striped align-middle text-center bg-white">
+            <thead class="table-light">
+              <tr>
+                <th>الاسم</th>
+                <th>الدور</th>
+                <th>الإيميل (إن وُجد)</th>
+                <th>الربط/الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="teachersTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- ✅ قائمة المستخدمين -->
-  <div class="card">
-    <div class="card-header bg-secondary text-white">👥 قائمة المستخدمين</div>
-    <div class="card-body" id="usersList">
-      <p class="text-muted">جارٍ التحميل...</p>
-    </div>
-  </div>
-</div>
-<script>
-  // إعداد Firebase
-  const firebaseConfig = {
-    apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
-    authDomain: "scudual.firebaseapp.com",
-    projectId: "scudual"
-  };
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
+  <script>
+    // ===== Firebase Setup =====
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
+      authDomain: "scudual.firebaseapp.com",
+      projectId: "scudual"
+    };
+    const app = firebase.initializeApp(firebaseConfig);
+    const db  = app.firestore();
 
-  // ✅ إضافة مستخدم جديد
-  document.getElementById("addUserForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const name = document.getElementById("name").value;
-    const email = document.getElementById("email").value;
-    const password = document.getElementById("password").value;
-    const role = document.getElementById("role").value;
-    const msg = document.getElementById("addUserMsg");
+    // تطبيق ثانوي لإدارة Auth (حتى ما نغيّر جلسة المتصفح)
+    const app2 = firebase.initializeApp(firebaseConfig, "adminApp");
+    const adminAuth = app2.auth();
 
-    try {
-      const newUser = await auth.createUserWithEmailAndPassword(email, password);
-      const uid = newUser.user.uid;
+    const teachersTable = document.getElementById('teachersTable');
+    const listMsg       = document.getElementById('listMsg');
 
-      await db.collection("users").doc(uid).set({
-        name,
-        role
-      });
+    // تحميل الأساتذة
+    async function loadTeachers(){
+      listMsg.textContent = "جارٍ التحميل...";
+      teachersTable.innerHTML = "";
+      try{
+        const snap = await db.collection('users').where('role','in',['teacher','admin']).get();
+        if (snap.empty){
+          listMsg.textContent = "لا يوجد أساتذة.";
+          return;
+        }
+        listMsg.textContent = "";
+        snap.forEach(doc=>{
+          const d = doc.data();
+          const name = d.name || '—';
+          const role = d.role || 'teacher';
+          const email = d.email || '';
+          const authUid = d.authUid || '';
 
-      msg.textContent = "✅ تم إضافة المستخدم بنجاح.";
-      document.getElementById("addUserForm").reset();
-      loadUsers();
-    } catch (error) {
-      msg.textContent = "❌ خطأ: " + error.message;
+          // صف الجدول
+          const tr = document.createElement('tr');
+
+          // الاسم
+          const tdName = document.createElement('td');
+          tdName.textContent = name;
+          tr.appendChild(tdName);
+
+          // الدور
+          const tdRole = document.createElement('td');
+          tdRole.innerHTML = `
+            <div class="d-flex justify-content-center align-items-center gap-2">
+              <select class="form-select form-select-sm" style="width:130px" onchange="updateRole('${doc.id}', this.value)">
+                <option value="teacher" ${role==='teacher'?'selected':''}>أستاذ</option>
+                <option value="admin" ${role==='admin'?'selected':''}>مدير</option>
+              </select>
+            </div>`;
+          tr.appendChild(tdRole);
+
+          // الإيميل (أو فورم ربط)
+          const tdEmail = document.createElement('td');
+          tdEmail.innerHTML = email
+            ? `<div>${email}</div><div class="small-muted mono">${authUid || 'بدون authUid'}</div>`
+            : `<span class="text-muted">— غير مربوط —</span>`;
+          tr.appendChild(tdEmail);
+
+          // إجراءات
+          const tdAct = document.createElement('td');
+          if (!email){ 
+            // فورم ربط لأول مرة (إنشاء حساب Auth وربط الحقول)
+            tdAct.innerHTML = `
+              <div class="row g-2">
+                <div class="col-12 col-md-5">
+                  <input type="email" class="form-control form-control-sm" placeholder="email@example.com" id="em-${doc.id}">
+                </div>
+                <div class="col-12 col-md-4">
+                  <input type="password" class="form-control form-control-sm" placeholder="كلمة المرور" id="pw-${doc.id}">
+                </div>
+                <div class="col-12 col-md-3 d-grid">
+                  <button class="btn btn-sm btn-primary" onclick="attachLogin('${doc.id}','${escapeHtml(name)}')">ربط الدخول</button>
+                </div>
+              </div>
+              <div class="small mt-1" id="msg-${doc.id}"></div>
+            `;
+          } else {
+            // أدوات بعد الربط
+            tdAct.innerHTML = `
+              <div class="d-flex flex-wrap gap-2 justify-content-center">
+                <button class="btn btn-sm btn-outline-secondary" onclick="sendReset('${email}','${doc.id}')">إرسال رابط إعادة تعيين</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteDoc('${doc.id}')">حذف (Firestore)</button>
+              </div>
+              <div class="small mt-1" id="msg-${doc.id}"></div>
+            `;
+          }
+          tr.appendChild(tdAct);
+
+          teachersTable.appendChild(tr);
+        });
+      }catch(e){
+        console.error(e);
+        listMsg.textContent = "فشل التحميل.";
+      }
     }
-  });
 
-  // ✅ تحميل المستخدمين من Firestore
-  async function loadUsers() {
-    const container = document.getElementById("usersList");
-    container.innerHTML = "";
-
-    const snapshot = await db.collection("users").get();
-
-    if (snapshot.empty) {
-      container.innerHTML = "<p class='text-muted'>لا يوجد مستخدمين بعد.</p>";
-      return;
+    // تحديث الدور
+    async function updateRole(uid, role){
+      try{
+        await db.collection('users').doc(uid).update({role});
+      }catch(e){ console.error(e); alert('فشل تحديث الدور'); }
     }
 
-    snapshot.forEach(doc => {
-      const user = doc.data();
-      const card = document.createElement("div");
-      card.className = "border p-3 rounded mb-2 d-flex justify-content-between align-items-center bg-white";
+    // ربط الدخول لأول مرة: إنشاء حساب Auth ثم تحديث user doc
+    async function attachLogin(docId, nameShown){
+      const msgEl = document.getElementById(`msg-${docId}`);
+      const email = document.getElementById(`em-${docId}`).value.trim();
+      const pass  = document.getElementById(`pw-${docId}`).value;
 
-      card.innerHTML = `
-        <div>
-          <strong>${user.name}</strong> - ${user.role}
-        </div>
-        <button class="btn btn-sm btn-danger" onclick="deleteUser('${doc.id}')">🗑️ حذف</button>
-      `;
-      container.appendChild(card);
+      msgEl.className = ''; msgEl.textContent = '';
+      if(!email || !pass){ msgEl.className='text-danger'; msgEl.textContent='أدخل الإيميل وكلمة المرور'; return; }
+
+      try{
+        // 1) إنشاء حساب Auth في التطبيق الثانوي
+        const cred = await adminAuth.createUserWithEmailAndPassword(email, pass);
+        const authUid = cred.user.uid;
+
+        // 2) تحديث وثيقة الأستاذ الحالية (لا نغيّر docId)
+        await db.collection('users').doc(docId).update({ email, authUid });
+
+        // 3) خروج من التطبيق الثانوي (تنظيف)
+        await adminAuth.signOut();
+
+        msgEl.className='text-success'; msgEl.textContent='✅ تم الربط بنجاح';
+        loadTeachers();
+      }catch(e){
+        console.error(e);
+        msgEl.className='text-danger';
+        msgEl.textContent = 'خطأ أثناء الربط: ' + (e?.message || e);
+      }
+    }
+
+    // إرسال رابط إعادة تعيين كلمة المرور
+    async function sendReset(email, rowId){
+      const msgEl = document.getElementById(`msg-${rowId}`);
+      msgEl.className=''; msgEl.textContent='';
+      try{
+        await adminAuth.sendPasswordResetEmail(email);
+        msgEl.className='text-success'; msgEl.textContent='📧 تم إرسال الرابط إلى البريد.';
+      }catch(e){
+        console.error(e);
+        msgEl.className='text-danger'; msgEl.textContent='تعذر الإرسال: ' + (e?.message || e);
+      }
+    }
+
+    // حذف وثيقة Firestore فقط
+    async function deleteDoc(uid){
+      if(!confirm('تأكيد حذف وثيقة هذا الأستاذ من Firestore؟')) return;
+      try{
+        await db.collection('users').doc(uid).delete();
+        loadTeachers();
+      }catch(e){ console.error(e); alert('فشل الحذف'); }
+    }
+
+    // إضافة أستاذ جديد في Firestore فقط (بدون Auth)
+    document.getElementById('addForm').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const addMsg = document.getElementById('addMsg');
+      addMsg.textContent = '';
+      try{
+        const name = document.getElementById('addName').value.trim();
+        const role = document.getElementById('addRole').value;
+        if(!name) throw new Error('أدخل الاسم');
+
+        const docRef = await db.collection('users').add({ name, role }); // docId عشوائي
+        addMsg.className='text-success'; addMsg.textContent='✅ تم الإضافة، اربطه لاحقًا بإيميل/باسورد من الجدول.';
+        (e.target).reset();
+        loadTeachers();
+      }catch(err){
+        addMsg.className='text-danger'; addMsg.textContent='فشل الإضافة: ' + (err?.message || err);
+      }
     });
-  }
 
-  // ✅ حذف المستخدم (فقط من Firestore)
-  async function deleteUser(uid) {
-    if (confirm("هل تريد حذف هذا المستخدم؟")) {
-      await db.collection("users").doc(uid).delete();
-      loadUsers();
-    }
-  }
+    // Helpers
+    function escapeHtml(s){return s.replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 
-  // تحميل المستخدمين عند الفتح
-  window.onload = loadUsers;
-</script>
+    // بدء
+    window.onload = loadTeachers;
+  </script>
 </body>
 </html>
