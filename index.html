@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>صفحة الأستاذ - الحجوزات</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet" />
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
@@ -31,7 +31,7 @@
         <div class="row g-3">
           <div class="col-md-4">
             <label class="form-label">تاريخ الموعد</label>
-            <input type="date" id="bookingDate" class="form-control" readonly>
+            <input type="date" id="bookingDate" class="form-control" readonly />
           </div>
           <div class="col-md-4">
             <label class="form-label">الفترة الزمنية</label>
@@ -116,9 +116,7 @@
       const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
       return `${y}-${m}-${day}`;
     }
-    function tomorrowStr(){
-      const t = new Date(); t.setDate(t.getDate()+1); return formatLocal(t);
-    }
+    function tomorrowStr(){ const t = new Date(); t.setDate(t.getDate()+1); return formatLocal(t); }
     function todayStr(){ return formatLocal(new Date()); }
 
     function showMsg(el, text, cls){
@@ -220,7 +218,7 @@
       }
     }
 
-    // محاضرات سابقة (آخر 10 مثلاً)
+    // محاضرات سابقة (فلترة محلية لتجنب فهرس مركّب)
     async function loadPast(containerId){
       const box = document.getElementById(containerId);
       box.innerHTML = `<p class="text-muted m-0">جارٍ التحميل…</p>`;
@@ -229,15 +227,15 @@
       const today = todayStr();
 
       try{
+        // 1) جرّب authUid (النموذج الجديد)
         let snap = await db.collection('bookings')
           .where('authUid','==',currentUser.uid)
-          .where('date','<',today)
           .get();
 
+        // 2) دعم قديم: userId == docId
         if(snap.empty && teacherDoc){
           snap = await db.collection('bookings')
             .where('userId','==',teacherDoc.id)
-            .where('date','<',today)
             .get();
         }
 
@@ -246,12 +244,19 @@
           return;
         }
 
-        const items = snap.docs.map(d=>({ id:d.id, ...d.data() }));
-        // رتب حسب التاريخ تنازلي ثم الوقت تنازلي
-        items.sort((a,b)=> (b.date.localeCompare(a.date)) || (startMinutes(b.time)-startMinutes(a.time)));
+        // فلترة محلية للماضي فقط ثم ترتيب
+        const all  = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+        const past = all.filter(it => (it.date || '') < today);
+
+        if(past.length === 0){
+          box.innerHTML = `<div class="alert alert-light m-0">لا توجد محاضرات سابقة.</div>`;
+          return;
+        }
+
+        past.sort((a,b) => (b.date.localeCompare(a.date)) || (startMinutes(b.time)-startMinutes(a.time)));
 
         let html = '';
-        for(const it of items.slice(0,20)){
+        for(const it of past.slice(0,20)){
           html += `
             <div class="d-flex justify-content-between align-items-center p-2 mb-2 border rounded bg-white">
               <div>
