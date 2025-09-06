@@ -1,184 +1,178 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>لوحة التحكم - منصة نون</title>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <style>
-    body { font-family: "Tahoma", sans-serif; background: #f8f9fa; margin: 20px; }
-    h1, h2 { text-align: center; color: #333; }
-    .section { background: #fff; padding: 20px; margin: 15px auto; border-radius: 8px; box-shadow: 0 0 5px #ddd; width: 90%; max-width: 900px; }
-    label { display: block; margin-top: 10px; }
-    input, select, button { padding: 8px; margin-top: 5px; width: 100%; border-radius: 4px; border: 1px solid #ccc; }
-    button { background: #007bff; color: #fff; cursor: pointer; border: none; }
-    button:hover { background: #0056b3; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    table, th, td { border: 1px solid #ccc; }
-    th, td { padding: 8px; text-align: center; }
-  </style>
-</head>
-<body>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>لوحة التحكم - Scudual</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
 
-  <h1>لوحة التحكم - منصة نون</h1>
-
-  <!-- إضافة أستاذ -->
-  <div class="section">
-    <h2>إضافة أستاذ</h2>
-    <label>اسم الأستاذ:</label>
-    <input type="text" id="teacherName">
-    <label>الإيميل:</label>
-    <input type="email" id="teacherEmail">
-    <label>كلمة المرور:</label>
-    <input type="password" id="teacherPassword">
-    <button onclick="addTeacher()">إضافة</button>
-  </div>
-
-  <!-- إضافة حجز يدوي -->
-  <div class="section">
-    <h2>إضافة حجز يدوي</h2>
-    <label>الأستاذ:</label>
-    <select id="teacherSelect"></select>
-    <label>اسم الطالب:</label>
-    <input type="text" id="studentName">
-    <label>تاريخ الحجز:</label>
-    <input type="date" id="bookingDate">
-    <button onclick="createManualBooking()">إضافة الحجز</button>
-  </div>
-
-  <!-- حجوزات اليوم -->
-  <div class="section">
-    <h2>حجوزات اليوم</h2>
-    <button onclick="printToday()">🖨️ طباعة حجوزات اليوم</button>
-    <table id="todayBookings">
-      <thead>
-        <tr><th>الأستاذ</th><th>الطالب</th><th>التاريخ</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <!-- حجوزات الغد -->
-  <div class="section">
-    <h2>حجوزات الغد</h2>
-    <button onclick="printTomorrow()">🖨️ طباعة حجوزات الغد</button>
-    <table id="tomorrowBookings">
-      <thead>
-        <tr><th>الأستاذ</th><th>الطالب</th><th>التاريخ</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <!-- حجوزات الشهر -->
-  <div class="section">
-    <h2>حجوزات الشهر</h2>
-    <table id="monthlyBookings">
-      <thead>
-        <tr><th>الأستاذ</th><th>الطالب</th><th>التاريخ</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 
   <script>
-    // 🔥 تهيئة Firebase
+    // إعداد Firebase
     const firebaseConfig = {
-      apiKey: "AIzaSyASqGIwNVzkLt2t6pIRRrd7WC2ltN4A34E",
-      authDomain: "noon-4dec9.firebaseapp.com",
-      projectId: "noon-4dec9",
-      storageBucket: "noon-4dec9.appspot.com",
-      messagingSenderId: "419619843903",
-      appId: "1:419619843903:web:abc123"
+      apiKey: "AIzaSyBsBJNcvaJXiIcJShLiwa-WFtY-VUMGTuk",
+      authDomain: "scudual.firebaseapp.com",
+      projectId: "scudual"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // 🧑‍🏫 إضافة أستاذ
-    async function addTeacher() {
-      const name = document.getElementById("teacherName").value;
-      const email = document.getElementById("teacherEmail").value;
-      const password = document.getElementById("teacherPassword").value;
-      if (!name || !email || !password) { alert("أكمل جميع الحقول"); return; }
-
-      try {
-        await db.collection("teachers").add({ name, email, password });
-        alert("تمت إضافة الأستاذ بنجاح ✅");
-        loadTeachers();
-      } catch (err) {
-        console.error("خطأ إضافة أستاذ:", err);
-      }
+    // ====== أدوات مساعدة ======
+    function formatLocalDate(d) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
     }
 
-    // 📋 تحميل قائمة الأساتذة
+    function to12h(one) {
+      if (!one) return '';
+      let [h, m] = one.split(':').map(Number);
+      const suffix = h >= 12 ? 'م' : 'ص';
+      h = h % 12; if (h === 0) h = 12;
+      return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')} ${suffix}`;
+    }
+
+    function printSection(id, title) {
+      const content = document.getElementById(id).innerHTML;
+      const win = window.open('', '', 'width=800,height=600');
+      win.document.write(`<h3>${title}</h3>`);
+      win.document.write(content);
+      win.print();
+    }
+
+    // ====== تحميل البيانات ======
     async function loadTeachers() {
-      const select = document.getElementById("teacherSelect");
-      select.innerHTML = "";
+      const recTeacher = document.getElementById("recTeacher");
+      recTeacher.innerHTML = "";
       try {
         const snapshot = await db.collection("teachers").get();
         snapshot.forEach(doc => {
-          const option = document.createElement("option");
-          option.value = doc.id;
-          option.textContent = doc.data().name;
-          select.appendChild(option);
+          const opt = document.createElement("option");
+          opt.value = doc.id;
+          opt.textContent = doc.data().name;
+          recTeacher.appendChild(opt);
         });
       } catch (err) {
         console.error("خطأ تحميل الأساتذة:", err);
       }
     }
 
-    // ✍️ إضافة حجز يدوي
-    async function createManualBooking() {
-      const teacherId = document.getElementById("teacherSelect").value;
-      const studentName = document.getElementById("studentName").value;
-      const bookingDate = document.getElementById("bookingDate").value;
+    async function loadShootRequests() {
+      const todayDiv = document.getElementById("shootToday");
+      const tomorrowDiv = document.getElementById("shootTomorrow");
+      const afterTomorrowDiv = document.getElementById("shootDayAfterTomorrow");
 
-      if (!teacherId || !studentName || !bookingDate) { alert("أكمل جميع الحقول"); return; }
-
-      try {
-        await db.collection("bookings").add({
-          teacherId, studentName,
-          date: bookingDate
-        });
-        alert("تمت إضافة الحجز ✅");
-        loadBookings();
-      } catch (err) {
-        console.error("خطأ إنشاء الحجز اليدوي:", err);
-      }
-    }
-
-    // 📅 تحميل الحجوزات
-    async function loadBookings() {
-      const today = new Date().toISOString().split("T")[0];
-      const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
-      const month = today.substring(0,7);
-
-      const todayTable = document.querySelector("#todayBookings tbody");
-      const tomorrowTable = document.querySelector("#tomorrowBookings tbody");
-      const monthlyTable = document.querySelector("#monthlyBookings tbody");
-      todayTable.innerHTML = ""; tomorrowTable.innerHTML = ""; monthlyTable.innerHTML = "";
+      const now = new Date();
+      const today = formatLocalDate(now);
+      const tomorrow = formatLocalDate(new Date(now.getTime() + 24*60*60*1000));
+      const afterTomorrow = formatLocalDate(new Date(now.getTime() + 48*60*60*1000));
 
       try {
         const snapshot = await db.collection("bookings").get();
+        let todayHtml = "", tomorrowHtml = "", afterHtml = "";
+
         snapshot.forEach(doc => {
           const data = doc.data();
-          const row = `<tr><td>${data.teacherId}</td><td>${data.studentName}</td><td>${data.date}</td></tr>`;
-          if (data.date === today) todayTable.innerHTML += row;
-          if (data.date === tomorrow) tomorrowTable.innerHTML += row;
-          if (data.date.startsWith(month)) monthlyTable.innerHTML += row;
+          const row = `<p>📷 الأستاذ: ${data.teacherName || "غير محدد"} | الطالب: ${data.studentName} | التاريخ: ${data.date}</p>`;
+          if (data.date === today) todayHtml += row;
+          if (data.date === tomorrow) tomorrowHtml += row;
+          if (data.date === afterTomorrow) afterHtml += row;
         });
+
+        todayDiv.innerHTML = todayHtml || "<p class='text-muted'>لا توجد حجوزات اليوم</p>";
+        tomorrowDiv.innerHTML = tomorrowHtml || "<p class='text-muted'>لا توجد حجوزات غد</p>";
+        afterTomorrowDiv.innerHTML = afterHtml || "<p class='text-muted'>لا توجد حجوزات بعد غد</p>";
       } catch (err) {
         console.error("خطأ تحميل الحجوزات:", err);
       }
     }
 
-    // 🖨️ الطباعة
-    function printToday() { window.print(); }
-    function printTomorrow() { window.print(); }
-
-    // تحميل تلقائي عند الفتح
-    loadTeachers();
-    loadBookings();
+    window.onload = () => {
+      loadTeachers();
+      loadShootRequests();
+    };
   </script>
+</head>
+<body class="bg-light py-4">
+  <div class="container">
+    <h3 class="text-center mb-4">📋 لوحة التحكم</h3>
+
+    <!-- من سيصور اليوم -->
+    <div class="card mb-4">
+      <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span>📅 من سيصور اليوم</span>
+        <button class="btn btn-light btn-sm" onclick="printSection('shootToday','حجوزات اليوم')">🖨 طباعة</button>
+      </div>
+      <div class="card-body" id="shootToday">
+        <p class="text-muted mb-0">جارٍ التحميل...</p>
+      </div>
+    </div>
+
+    <!-- من سيصور غداً -->
+    <div class="card mb-4">
+      <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+        <span>📅 من سيصور غداً</span>
+        <button class="btn btn-light btn-sm" onclick="printSection('shootTomorrow','حجوزات الغد')">🖨 طباعة</button>
+      </div>
+      <div class="card-body" id="shootTomorrow">
+        <p class="text-muted mb-0">جارٍ التحميل...</p>
+      </div>
+    </div>
+
+    <!-- من سيصور بعد غد -->
+    <div class="card mb-4">
+      <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+        <span>📅 من سيصور بعد غد</span>
+        <button class="btn btn-light btn-sm" onclick="printSection('shootDayAfterTomorrow','حجوزات بعد غد')">🖨 طباعة</button>
+      </div>
+      <div class="card-body" id="shootDayAfterTomorrow">
+        <p class="text-muted mb-0">جارٍ التحميل...</p>
+      </div>
+    </div>
+
+    <!-- حجز ثابت شهري -->
+    <div class="card mb-4">
+      <div class="card-header bg-success text-white">📆 حجز ثابت شهري</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">الشهر</label>
+            <select id="recMonth" class="form-select">
+              <option value="8">شهر 8 (آب)</option>
+              <option value="9">شهر 9 (أيلول)</option>
+              <option value="10">شهر 10 (تشرين الأول)</option>
+              <option value="11">شهر 11 (تشرين الثاني)</option>
+              <option value="12">شهر 12 (كانون الأول)</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">الأستاذ</label>
+            <select id="recTeacher" class="form-select"></select>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">أيام الأسبوع</label>
+            <div class="d-flex flex-wrap">
+              <div class="form-check me-2"><input type="checkbox" class="form-check-input" value="السبت"> السبت</div>
+              <div class="form-check me-2"><input type="checkbox" class="form-check-input" value="الأحد"> الأحد</div>
+              <div class="form-check me-2"><input type="checkbox" class="form-check-input" value="الإثنين"> الإثنين</div>
+              <div class="form-check me-2"><input type="checkbox" class="form-check-input" value="الثلاثاء"> الثلاثاء</div>
+              <div class="form-check me-2"><input type="checkbox" class="form-check-input" value="الأربعاء"> الأربعاء</div>
+              <div class="form-check me-2"><input type="checkbox" class="form-check-input" value="الخميس"> الخميس</div>
+              <div class="form-check"><input type="checkbox" class="form-check-input" value="الجمعة"> الجمعة</div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="form-label">الوقت</label>
+          <input type="time" id="recTime" class="form-control">
+        </div>
+        <button class="btn btn-success mt-3">تثبيت الحجز</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
